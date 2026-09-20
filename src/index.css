@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  /* Prevents iOS Safari/PWA from auto-zooming on input focus when
+     font-size is below 16px, without forcing every input to 16px. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: #faf8f5;
+  color: #2c2620;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  /* Respect the notch / home indicator when installed as a PWA on iOS. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.serif {
+  font-family: 'Newsreader', serif;
+}
+
+.card-transition {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #faf8f5;
+}
+::-webkit-scrollbar-thumb {
+  background: #d5c7b7;
+  border-radius: 999px;
+}
+
+/* Visible keyboard focus everywhere — quiet but present */
+:focus-visible {
+  outline: 2px solid #6c9a8b;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
