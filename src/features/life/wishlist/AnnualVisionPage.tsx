@@ -3,8 +3,10 @@ import { useLifeItemsOfType } from '../useLifeItems';
 import { createLifeItem, updateLifeItem, deleteLifeItem } from '@/db/repositories/lifeRepository';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { formatDisplayDate } from '@/shared/utils/formatDate';
-import type { WishItem } from '@/db/schema';
+import type { BookItem, WishItem } from '@/db/schema';
 import WishEditorModal from './WishEditorModal';
+import VisionPasteModal from './VisionPasteModal';
+import { booksFinishedIn, readingGoalTarget } from './visionList';
 import ConfirmInline from '@/shared/components/ConfirmInline';
 
 interface AnnualVisionPageProps {
@@ -19,9 +21,19 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
   const [editing, setEditing] = useState<'closed' | 'new' | WishItem>(initialOpenItem ?? 'closed');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [justCompletedId, setJustCompletedId] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
+  const books = useLifeItemsOfType('book') as BookItem[];
 
   const currentYear = new Date().getFullYear();
-  const pending = wishes.filter((w) => !w.done).sort((a, b) => (a.year ?? 0) - (b.year ?? 0));
+  // Same year: in the order they were added (so a pasted list keeps its order).
+  const pending = wishes.filter((w) => !w.done).sort((a, b) => (a.year ?? 0) - (b.year ?? 0) || a.createdAt.localeCompare(b.createdAt));
+  /** A goal like "Read 12 books" → progress from the Books section. */
+  const readingProgress = (wish: WishItem) => {
+    const target = readingGoalTarget(wish.title);
+    if (!target) return null;
+    const read = booksFinishedIn(books, wish.year ?? currentYear);
+    return { read, target, pct: Math.min(100, Math.round((read / target) * 100)) };
+  };
   const done = wishes.filter((w) => w.done);
 
   const toggleDone = async (wish: WishItem) => {
@@ -58,8 +70,14 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
         </button>
         <h2 className="serif text-xl font-semibold text-sand-900">Annual Vision</h2>
         <button
+          onClick={() => setPasting(true)}
+          className="ml-auto px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-2xl"
+        >
+          Add several
+        </button>
+        <button
           onClick={() => setEditing('new')}
-          className="ml-auto px-4 py-2 bg-terracotta-400 hover:bg-terracotta-600 text-white text-xs font-semibold rounded-2xl shadow-sm"
+          className="px-4 py-2 bg-terracotta-400 hover:bg-terracotta-600 text-white text-xs font-semibold rounded-2xl shadow-sm"
         >
           + Add
         </button>
@@ -95,6 +113,19 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
                       {wish.year ?? currentYear}
                       {wish.category ? ` · ${wish.category}` : ''}
                     </p>
+                    {(() => {
+                      const p = readingProgress(wish);
+                      return p ? (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <div className="h-1.5 flex-1 bg-sand-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-sage-500 rounded-full" style={{ width: `${p.pct}%` }} />
+                          </div>
+                          <span className="text-[10px] text-sage-700 font-semibold shrink-0">
+                            📚 {p.read} / {p.target} read
+                          </span>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                   {wish.favorite && <span className="text-terracotta-400 text-sm shrink-0">♥</span>}
                   <button onClick={() => setEditing(wish)} className="text-sand-800/50 hover:text-sand-900 text-[11px] px-1 shrink-0">
@@ -158,6 +189,17 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
               showToast('Updated');
             }
             setEditing('closed');
+          }}
+        />
+      )}
+
+      {pasting && (
+        <VisionPasteModal
+          existing={wishes}
+          onClose={() => setPasting(false)}
+          onAdded={(count) => {
+            setPasting(false);
+            showToast(`Added ${count} goal${count === 1 ? '' : 's'} to your vision board 🎯`);
           }}
         />
       )}

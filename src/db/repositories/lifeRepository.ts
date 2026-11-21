@@ -54,8 +54,12 @@ export async function createLifeItem(input: NewLifeItemInput): Promise<LifeItem>
 
 /** Adds many items in one transaction (used by imports — thousands of rows in a second or two). */
 export async function bulkCreateLifeItems(inputs: NewLifeItemInput[]): Promise<number> {
-  const timestamp = nowIso();
-  const items = inputs.map((input) => ({ ...input, id: generateId(), createdAt: timestamp, updatedAt: timestamp }) as LifeItem);
+  // One millisecond apart, so the order they were given in is kept wherever lists sort by createdAt.
+  const start = Date.now();
+  const items = inputs.map((input, i) => {
+    const timestamp = new Date(start + i).toISOString();
+    return { ...input, id: generateId(), createdAt: timestamp, updatedAt: timestamp } as LifeItem;
+  });
   await db.lifeItems.bulkAdd(items);
   return items.length;
 }

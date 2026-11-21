@@ -39,9 +39,9 @@ describe('advice is built from real data', () => {
   });
 
   it('names the person you have not connected with for longest', () => {
-    const insight = allInsights(data({ people: [person('Ramki', daysAgo(3)), person('Aathira', daysAgo(25))] })).find((i) => i.rule === 'people-gap')!;
-    expect(insight.message).toContain('Aathira');
-    expect(insight.because).toBe('You last connected with Aathira 25 days ago.');
+    const insight = allInsights(data({ people: [person('Sam', daysAgo(3)), person('Alex', daysAgo(25))] })).find((i) => i.rule === 'people-gap')!;
+    expect(insight.message).toContain('Alex');
+    expect(insight.because).toBe('You last connected with Alex 25 days ago.');
   });
 
   it('celebrates a finished book by title', () => {
@@ -88,7 +88,7 @@ describe('reading the journal on-device', () => {
 
 describe('not repeating', () => {
   const care: CareEntry[] = [];
-  const advice = () => allInsights(data({ care, people: [person('Aathira', daysAgo(25))], toolEvents: Array.from({ length: 4 }, (_, i) => scrollTap(i, '15:00')) }));
+  const advice = () => allInsights(data({ care, people: [person('Alex', daysAgo(25))], toolEvents: Array.from({ length: 4 }, (_, i) => scrollTap(i, '15:00')) }));
 
   it('keeps the same picks all day, then rests them for a few days', () => {
     const day1 = chooseToday(advice(), emptyHistory(), TODAY);

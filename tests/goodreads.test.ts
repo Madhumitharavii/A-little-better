@@ -16,7 +16,7 @@ const row = (o: Partial<Record<string, string>>) =>
 
 const CSV = '﻿' + [
   HEADER,
-  row({ id: '1', title: 'The Name of the Wind (The Kingkiller Chronicle, #1)', author: 'Patrick Rothfuss', rating: '5', read: '2023/05/12', added: '2023/04/01', shelves: 'favorites, fantasy', count: '3', review: 'Loved it.<br/><br/>The <b>music</b> scenes &amp; Kvothe.', private: 'Lent to Nithu' }),
+  row({ id: '1', title: 'The Name of the Wind (The Kingkiller Chronicle, #1)', author: 'Patrick Rothfuss', rating: '5', read: '2023/05/12', added: '2023/04/01', shelves: 'favorites, fantasy', count: '3', review: 'Loved it.<br/><br/>The <b>music</b> scenes &amp; Kvothe.', private: 'Lent to a friend' }),
   row({ id: '2', title: 'Atomic Habits', author: 'James Clear', rating: '0', read: '', exclusive: 'currently-reading', shelves: 'currently-reading, self-help' }),
   row({ id: '3', title: 'Pachinko', author: 'Min Jin Lee', exclusive: 'to-read', added: '2025/02/03', shelves: 'to-read' }),
   row({ id: '4', title: 'Infinite Jest', author: 'David Foster Wallace', exclusive: 'read', shelves: 'dnf' }),
@@ -47,7 +47,7 @@ describe('Goodreads import', () => {
   it('cleans reviews, keeps private notes, reads ratings, dates, rereads and shelves', () => {
     const b = byTitle('The Name');
     expect(b).toMatchObject({ rating: 5, dateRead: '2023-05-12', dateAdded: '2023-04-01', readCount: 3, favorite: true, shelves: ['fantasy'] });
-    expect(b.notes).toBe('Loved it.\n\nThe music scenes & Kvothe.\n\nPrivate notes: Lent to Nithu');
+    expect(b.notes).toBe('Loved it.\n\nThe music scenes & Kvothe.\n\nPrivate notes: Lent to a friend');
     expect(byTitle('Atomic').rating).toBeUndefined();
     expect(byTitle('Atomic').shelves).toEqual(['self-help']);
   });

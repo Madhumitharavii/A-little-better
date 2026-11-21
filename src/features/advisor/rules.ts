@@ -50,7 +50,7 @@ export interface AdvisorData {
 export type InsightKind = 'kudos' | 'nudge' | 'care';
 
 export interface Insight {
-  /** Which rule, plus what it's about (e.g. "people-gap:Aathira") — used so the same advice doesn't come back too soon. */
+  /** Which rule, plus what it's about (e.g. "people-gap:Alex") — used so the same advice doesn't come back too soon. */
   key: string;
   rule: string;
   kind: InsightKind;
