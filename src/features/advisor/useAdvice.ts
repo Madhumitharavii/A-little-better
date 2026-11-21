@@ -4,6 +4,7 @@ import { db } from '@/db/db';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { allInsights, type AdvisorData, type Insight } from './rules';
 import { allSeen, chooseToday, dismissRule, loadHistory, markSeen, saveHistory, subscribeHistory, subscribeSeen } from './select';
+import { useAiEnabled, useAiState } from '@/features/ai/aiEngine';
 
 /** Everything the advisor reads — straight from the local database. */
 function useAdvisorData(): AdvisorData | undefined {
@@ -37,7 +38,14 @@ function useAdvisorData(): AdvisorData | undefined {
  * pop-up (both read the same history, so they always agree).
  */
 export function useAdvice() {
-  const data = useAdvisorData();
+  const baseData = useAdvisorData();
+  const aiEnabled = useAiEnabled();
+  const ai = useAiState();
+  // Emotion understanding from the on-device model, when it's on and ready.
+  const data = useMemo(
+    () => (baseData ? { ...baseData, aiThemeCounts: aiEnabled && ai.ready ? ai.emotionCounts : null } : undefined),
+    [baseData, aiEnabled, ai.ready, ai.emotionCounts],
+  );
   const [history, setHistory] = useState(loadHistory);
   const [, rerender] = useReducer((n: number) => n + 1, 0);
 

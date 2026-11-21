@@ -3,6 +3,7 @@ import Modal, { ModalHeader } from '@/shared/components/Modal';
 import { getLocalDateKey } from '@/db/dateUtils';
 import DateField from '@/shared/components/DateField';
 import type { JournalEntry } from '@/db/schema';
+import { useTagSuggestions } from '@/features/ai/useTagSuggestions';
 
 const MOODS = ['😊', '🙂', '😐', '😕', '😔'];
 
@@ -18,6 +19,10 @@ export default function JournalEditorModal({ existing, onClose, onSave }: Journa
   const [body, setBody] = useState(existing?.body ?? '');
   const [mood, setMood] = useState(existing?.mood ?? '');
   const [tagsInput, setTagsInput] = useState(existing?.tags?.join(', ') ?? '');
+  const currentTags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean);
+  // On-device AI: tags suggested from what's being written.
+  const suggested = useTagSuggestions(`${title}. ${body}`, currentTags);
+  const addTag = (tag: string) => setTagsInput([...currentTags, tag].join(', '));
 
   const handleSave = () => {
     if (!body.trim()) return;
@@ -84,6 +89,22 @@ export default function JournalEditorModal({ existing, onClose, onSave }: Journa
             placeholder="books, grateful, work..."
             className="w-full p-3 bg-sand-50 border border-sand-200 rounded-2xl text-sand-900 focus:outline-none focus:border-sand-300"
           />
+          {suggested.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="text-[10px] text-sand-800/50">Suggested:</span>
+              {suggested.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => addTag(tag)}
+                  className="text-[11px] px-2.5 py-1 rounded-full bg-sage-100 text-sage-700 hover:bg-sage-300/60 font-medium"
+                  aria-label={`Add tag ${tag}`}
+                >
+                  + #{tag}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

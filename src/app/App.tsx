@@ -10,6 +10,7 @@ import MePage from '@/features/me/MePage';
 import SettingsPage from '@/features/settings/SettingsPage';
 import StudyTimerPill from '@/features/study/StudyTimerPill';
 import NoticedButton from '@/features/advisor/NoticedButton';
+import { useAiBackground } from '@/features/ai/aiEngine';
 import LifePage from '@/features/life/LifePage';
 import WeekPage from '@/features/week/WeekPage';
 import { checkReminders } from '@/shared/utils/reminders';
@@ -27,6 +28,9 @@ export default function App() {
   const { toastMessage, showToast } = useToast();
 
   const settings = useLiveQuery(() => getSettings(), []);
+
+  // On-device AI (opt-in): keeps embeddings and analysis fresh in the background.
+  useAiBackground();
 
   // Light / dark / match device (Me → Appearance). Re-applied when the
   // device itself switches, for the "match device" choice.

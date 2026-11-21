@@ -6,6 +6,7 @@ import { formatDisplayDate } from '@/shared/utils/formatDate';
 import { useState } from 'react';
 import StudySection from '@/features/study/StudySection';
 import SubjectPage from '@/features/study/SubjectPage';
+import WeekSummaryCard from '@/features/ai/WeekSummaryCard';
 import { useSubjects, useStudySessions, sessionsWithin, totalMinutes, formatMinutes } from '@/features/study/useStudy';
 
 
@@ -129,6 +130,9 @@ export default function WeekPage({ showToast }: { showToast: (msg: string) => vo
           You showed up on {week.daysShowedUp} of the last 7 days — {formatWeekday(week.days[0]?.date ?? today)} through {formatWeekday(today)}.
         </p>
       </section>
+
+      {/* The week in its own words (on-device AI, when it's on) */}
+      <WeekSummaryCard />
 
       {/* What I'm learning — study timer, subjects, and sessions */}
       <StudySection showToast={showToast} onOpenSubject={setOpenSubjectId} />

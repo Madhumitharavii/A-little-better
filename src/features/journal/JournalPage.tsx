@@ -3,6 +3,7 @@ import { useJournal } from './useJournal';
 import JournalEntryCard from './JournalEntryCard';
 import JournalEditorModal from './JournalEditorModal';
 import type { JournalEntry } from '@/db/schema';
+import AiJournalTools from '@/features/ai/AiJournalTools';
 
 interface JournalPageProps {
   showToast: (msg: string) => void;
@@ -27,6 +28,8 @@ export default function JournalPage({ showToast }: JournalPageProps) {
           + New Entry
         </button>
       </section>
+
+      <AiJournalTools />
 
       {entries.length === 0 ? (
         <div className="bg-white p-8 rounded-3xl border border-sand-200 text-center space-y-2">

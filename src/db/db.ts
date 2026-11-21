@@ -10,6 +10,7 @@ import type {
   AppSettings,
   SyncTombstone,
   ToolEvent,
+  EmbeddingRecord,
 } from './schema';
 
 /**
@@ -33,6 +34,7 @@ class AppDatabase extends Dexie {
   settings!: Table<AppSettings, string>;
   syncTombstones!: Table<SyncTombstone, string>;
   toolEvents!: Table<ToolEvent, string>;
+  embeddings!: Table<EmbeddingRecord, string>;
 
   constructor() {
     super('a-little-better');
@@ -105,6 +107,22 @@ class AppDatabase extends Dexie {
       settings: 'id, updatedAt',
       syncTombstones: 'id, table',
       toolEvents: 'id, tool, at',
+    });
+
+    // On-device AI pass: a local-only cache of sentence embeddings
+    // (never synced). Purely additive; everything else unchanged.
+    this.version(6).stores({
+      careEntries: 'id, date, itemKey, [date+itemKey], updatedAt',
+      dailyReflections: 'id, date, updatedAt',
+      journalEntries: 'id, date, sourceTool, updatedAt, deletedAt',
+      lifeItems: 'id, type, status, favorite, updatedAt, deletedAt, [type+deletedAt]',
+      lifeImages: 'id, createdAt',
+      people: 'id, name, updatedAt, deletedAt',
+      periodEntries: 'id, startDate, updatedAt, deletedAt',
+      settings: 'id, updatedAt',
+      syncTombstones: 'id, table',
+      toolEvents: 'id, tool, at',
+      embeddings: 'id, source',
     });
   }
 }

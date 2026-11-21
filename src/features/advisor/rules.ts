@@ -37,6 +37,13 @@ export interface AdvisorData {
   /** Study subjects (with topics) and sessions — logged on the Week page. */
   subjects: SubjectItem[];
   studySessions: StudySessionItem[];
+  /**
+   * When on-device AI is on: emotion-based theme counts for recent
+   * journal entries and reflections (from the sentence-embedding model),
+   * used instead of the word list. The word list still screens for
+   * very heavy writing either way.
+   */
+  aiThemeCounts?: Partial<Record<import('./lexicon').Theme, number>> | null;
 }
 
 export type InsightKind = 'kudos' | 'nudge' | 'care';
@@ -426,6 +433,14 @@ const journalThemes: Rule = (d) => {
   ].filter((t) => t.trim());
   if (texts.length === 0) return null;
   const t = countThemes(texts);
+  // With on-device AI on, the model's reading of each entry's emotion
+  // replaces the word list for everyday feelings (it understands phrasing,
+  // not just words). Very heavy writing is always screened by the word list.
+  const fromModel = !!d.aiThemeCounts;
+  if (d.aiThemeCounts) {
+    for (const theme of ['tired', 'stressed', 'low', 'lonely', 'happy', 'grateful'] as const) t[theme] = d.aiThemeCounts[theme] ?? 0;
+  }
+  const how = fromModel ? ' (understood on this device)' : '';
 
   if (t.heavy > 0) {
     return {
@@ -454,7 +469,7 @@ const journalThemes: Rule = (d) => {
         priority: o.priority + t[theme],
         icon: o.icon,
         message: o.message,
-        because: `You've written about ${o.word} in ${plural(t[theme], 'entry', 'entries')} over the last two weeks.`,
+        because: `You've written about ${o.word} in ${plural(t[theme], 'entry', 'entries')} over the last two weeks${how}.`,
         fingerprint: `${t[theme]}`,
       };
     }
@@ -467,7 +482,7 @@ const journalThemes: Rule = (d) => {
       priority: 44 + t.happy + t.grateful,
       icon: '☀️',
       message: pick([`There's been real joy in your writing lately. Notice what's bringing it — and do more of that.`, `Your words have been bright recently. Hold on to whatever is making you happy.`], d.today, 'happy'),
-      because: `Happy or grateful moments in ${plural(t.happy + t.grateful, 'entry', 'entries')} over the last two weeks.`,
+      because: `Happy or grateful moments in ${plural(t.happy + t.grateful, 'entry', 'entries')} over the last two weeks${how}.`,
       fingerprint: `${t.happy + t.grateful}`,
     };
   }

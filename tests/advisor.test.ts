@@ -63,6 +63,20 @@ describe('advice is built from real data', () => {
   });
 });
 
+describe('with on-device AI', () => {
+  const entry = (body: string): JournalEntry => ({ id: body, date: daysAgo(1), body, createdAt: iso(daysAgo(1)), updatedAt: iso(daysAgo(1)) });
+  it("uses the model's emotion reading instead of the word list", () => {
+    // The words alone don't say "stressed", but the model read two entries as anxious.
+    const journal = [entry('Big day tomorrow, so much riding on it'), entry('Could not focus at all, mind racing')];
+    const insight = allInsights(data({ journal, aiThemeCounts: { stressed: 2 } })).find((i) => i.rule === 'journal-stressed')!;
+    expect(insight.because).toContain('(understood on this device)');
+  });
+  it('still screens very heavy writing with the word list', () => {
+    const [first] = allInsights(data({ journal: [entry('I feel hopeless lately')], aiThemeCounts: { happy: 3 } }));
+    expect(first.rule).toBe('journal-heavy');
+  });
+});
+
 describe('reading the journal on-device', () => {
   it('understands "didn\'t cry" is not sadness', () => {
     expect(themesIn("I was sad but I didn't cry much").has('low')).toBe(true); // "sad" still counts

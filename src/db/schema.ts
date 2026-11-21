@@ -351,6 +351,21 @@ export interface ToolEvent {
   at: string;
 }
 
+/**
+ * A sentence embedding ("meaning fingerprint") computed by the on-device
+ * AI model — kept ONLY on this device, never synced or backed up (it can
+ * always be recomputed from the text). `hash` detects when the text changed.
+ */
+export interface EmbeddingRecord {
+  /** `${source}:${sourceId}` */
+  id: string;
+  source: 'journal' | 'reflection' | 'life' | 'study' | 'anchor' | 'sentence';
+  sourceId: string;
+  hash: string;
+  vector: number[];
+  updatedAt: string;
+}
+
 export interface SyncTombstone {
   /** `${table}:${rowId}` — one tombstone per deleted row. */
   id: string;

@@ -3,9 +3,10 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // A Little Better — local-first PWA build config.
-// No network calls are required for the app to function; the only
-// runtime caching entries below are for the Google Fonts CDN so that,
-// once fetched on a first online visit, they keep working offline too.
+// No network calls are required for the app to function. Runtime caching
+// below covers the Google Fonts CDN, plus the app's own on-device AI files
+// (/models and /ort — too large to precache, so they're cached on first use
+// and then work offline).
 export default defineConfig({
   resolve: {
     alias: {
@@ -49,7 +50,18 @@ export default defineConfig({
       workbox: {
         // Precache the built app shell so the app loads with no network at all.
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        globIgnores: ['**/models/**', '**/ort/**'],
         runtimeCaching: [
+          {
+            // The on-device AI model and engine, served by the app itself.
+            urlPattern: ({ url }) => url.pathname.startsWith('/models/') || url.pathname.startsWith('/ort/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'on-device-ai',
+              expiration: { maxEntries: 12 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
@@ -78,5 +90,12 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+  },
+  // Transformers.js ships its own WebAssembly loader; let it load as-is.
+  optimizeDeps: {
+    exclude: ['@huggingface/transformers'],
+  },
+  worker: {
+    format: 'es',
   },
 });

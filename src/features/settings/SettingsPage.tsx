@@ -1,6 +1,7 @@
 import SettingsSection from '@/features/me/SettingsSection';
 import AccountSection from '@/features/me/AccountSection';
 import BackupSection from '@/features/me/BackupSection';
+import OnDeviceAiSection from '@/features/ai/OnDeviceAiSection';
 
 interface SettingsPageProps {
   showToast: (msg: string) => void;
@@ -19,7 +20,7 @@ export default function SettingsPage({ showToast, onBack }: SettingsPageProps) {
         <div className="border-b border-sand-100 pb-3 flex items-start justify-between gap-3">
           <div>
             <h2 className="serif text-2xl font-semibold text-sand-900">Settings</h2>
-            <p className="text-xs text-sand-800/60">Appearance, sync, and your data.</p>
+            <p className="text-xs text-sand-800/60">Appearance, on-device AI, sync, and your data.</p>
           </div>
           <button
             onClick={onBack}
@@ -31,6 +32,7 @@ export default function SettingsPage({ showToast, onBack }: SettingsPageProps) {
 
         <div className="space-y-4">
           <SettingsSection />
+          <OnDeviceAiSection />
           <AccountSection showToast={showToast} />
           <BackupSection showToast={showToast} />
         </div>

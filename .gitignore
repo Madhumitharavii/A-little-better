@@ -9,3 +9,4 @@ dev-dist
 .env.local
 .env.*.local
 !.env.example
+public/ort/

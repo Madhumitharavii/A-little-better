@@ -2,6 +2,7 @@ import StatsSection from './StatsSection';
 import RemindersSection from './RemindersSection';
 import PeriodSection from './period/PeriodSection';
 import PeopleSection from '@/features/people/PeopleSection';
+import EmotionTrendCard from '@/features/ai/EmotionTrendCard';
 
 interface MePageProps {
   showToast: (msg: string) => void;
@@ -21,6 +22,7 @@ export default function MePage({ showToast }: MePageProps) {
           <PeopleSection showToast={showToast} />
           <RemindersSection />
           <PeriodSection showToast={showToast} />
+          <EmotionTrendCard />
         </div>
 
         <StatsSection />
