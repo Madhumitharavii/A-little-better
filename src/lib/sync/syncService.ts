@@ -2,16 +2,12 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import type { SyncTableName } from './types';
 
 /**
- * NOTHING IN THE APP CALLS THIS FILE YET.
- *
- * This is the safe backend foundation for a future two-way sync
- * feature: generic push/pull helpers against Supabase, plus image
- * blob upload/download against Supabase Storage. The actual sync
- * process — deciding what to push, resolving conflicts between two
- * devices, merging instead of overwriting, and the UI to turn it on —
- * is intentionally NOT built in this pass. Building that on top of
- * these primitives, without ever blindly overwriting either device's
- * data, is the next step.
+ * Low-level Supabase helpers for two-way sync: generic push/pull of
+ * rows, soft deletes, and image blob upload/download against
+ * Supabase Storage. These are deliberately "dumb" primitives — the
+ * actual sync process (what to push, last-write-wins conflict
+ * handling, never blindly overwriting either device's data) lives in
+ * `syncEngine.ts`, which is the only caller of this file.
  *
  * Every exported function checks `isSupabaseConfigured` and throws a
  * clear, catchable error if it's not set up, rather than the app
@@ -26,7 +22,18 @@ function requireSupabase() {
 }
 
 /**
- * Upserts a single row (insert-or-update, matched by its `id`) into
+ * The columns an upsert matches on. Every table's primary key is `id`
+ * alone, except `settings`, whose primary key is the composite
+ * (user_id, id) — see 0001_initial_schema.sql. Matching on the real
+ * primary key means no extra database constraint is needed (so
+ * migration 0002 is optional).
+ */
+function conflictTarget(table: SyncTableName): string {
+  return table === 'settings' ? 'user_id,id' : 'id';
+}
+
+/**
+ * Upserts a single row (insert-or-update, matched by its primary key) into
  * the given table. The row must already be in the table's remote
  * shape — see mapping.ts for local-entity-to-row conversion.
  */
@@ -41,7 +48,7 @@ export async function pushRow<T extends Record<string, unknown>>(table: SyncTabl
   // not pushRow's own signature or the type-checking every caller of
   // pushRow still gets.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (client.from(table) as any).upsert(row, { onConflict: 'id' });
+  const { error } = await (client.from(table) as any).upsert(row, { onConflict: conflictTarget(table) });
   if (error) throw error;
 }
 
@@ -50,7 +57,7 @@ export async function pushRows<T extends Record<string, unknown>>(table: SyncTab
   if (rows.length === 0) return;
   const client = requireSupabase();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (client.from(table) as any).upsert(rows, { onConflict: 'id' });
+  const { error } = await (client.from(table) as any).upsert(rows, { onConflict: conflictTarget(table) });
   if (error) throw error;
 }
 

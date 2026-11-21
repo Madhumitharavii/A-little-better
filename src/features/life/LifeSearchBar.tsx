@@ -8,6 +8,7 @@ export default function LifeSearchBar({ value, onChange }: LifeSearchBarProps) {
     <div className="relative">
       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sand-800/40 text-sm">🔍</span>
       <input
+        aria-label="Search Life"
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}

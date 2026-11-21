@@ -43,7 +43,7 @@ export default function EveningModeTool({ todaysCare, initialNotes, onClose, onS
       <div className="space-y-4 text-xs">
         <div>
           <label className="block font-semibold text-sand-900 mb-1">One good thing about today</label>
-          <input
+          <input aria-label="One good thing about today"
             type="text"
             value={goodThing}
             onChange={(e) => setGoodThing(e.target.value)}
@@ -54,7 +54,7 @@ export default function EveningModeTool({ todaysCare, initialNotes, onClose, onS
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">One thing I want to leave for tomorrow</label>
-          <input
+          <input aria-label="One thing I want to leave for tomorrow"
             type="text"
             value={leaveTomorrow}
             onChange={(e) => setLeaveTomorrow(e.target.value)}

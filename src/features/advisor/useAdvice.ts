@@ -1,0 +1,69 @@
+import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db/db';
+import { getLocalDateKey } from '@/db/dateUtils';
+import { allInsights, type AdvisorData, type Insight } from './rules';
+import { allSeen, chooseToday, dismissRule, loadHistory, markSeen, saveHistory, subscribeHistory, subscribeSeen } from './select';
+
+/** Everything the advisor reads — straight from the local database. */
+function useAdvisorData(): AdvisorData | undefined {
+  return useLiveQuery(async () => {
+    const [care, journal, reflections, life, people, toolEvents] = await Promise.all([
+      db.careEntries.toArray(),
+      db.journalEntries.toArray(),
+      db.dailyReflections.toArray(),
+      db.lifeItems.toArray(),
+      db.people.toArray(),
+      db.toolEvents.toArray(),
+    ]);
+    // The lifeItems table also holds study rows — split them out.
+    const rows = life.filter((i) => !i.deletedAt) as unknown as Array<{ type: string }>;
+    return {
+      today: getLocalDateKey(),
+      care,
+      journal: journal.filter((j) => !j.deletedAt),
+      reflections,
+      life: rows.filter((i) => i.type !== 'subject' && i.type !== 'studySession') as unknown as AdvisorData['life'],
+      people: people.filter((p) => !p.deletedAt),
+      toolEvents,
+      subjects: rows.filter((i) => i.type === 'subject') as unknown as AdvisorData['subjects'],
+      studySessions: rows.filter((i) => i.type === 'studySession') as unknown as AdvisorData['studySessions'],
+    };
+  }, []);
+}
+
+/**
+ * Today's advice, shared by the Today card and the header's 🧭 Noticed
+ * pop-up (both read the same history, so they always agree).
+ */
+export function useAdvice() {
+  const data = useAdvisorData();
+  const [history, setHistory] = useState(loadHistory);
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
+
+  useEffect(() => subscribeHistory(setHistory), []);
+  useEffect(() => subscribeSeen(rerender), []);
+
+  const candidates = useMemo(() => (data ? allInsights(data) : []), [data]);
+  const today = data?.today ?? getLocalDateKey();
+  const { picks, history: nextHistory } = useMemo(() => chooseToday(candidates, history, today), [candidates, history, today]);
+
+  useEffect(() => {
+    if (data && nextHistory !== history) saveHistory(nextHistory);
+  }, [data, nextHistory, history]);
+
+  const keys = picks.map((p) => p.key);
+
+  return {
+    ready: !!data,
+    picks,
+    hasAnyData: candidates.length > 0,
+    /** New advice today that hasn't been looked at yet → the dot. */
+    hasUnseen: picks.length > 0 && !allSeen(today, keys),
+    markSeen: () => markSeen(today, keys),
+    notHelpful: (insight: Insight) => {
+      // Quiet this kind for a month, and drop today's cached picks so something else can take its place.
+      saveHistory({ ...dismissRule(history, insight.rule, today), today: undefined });
+    },
+  };
+}

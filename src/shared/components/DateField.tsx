@@ -119,7 +119,7 @@ export default function DateField({ label, value, onChange, className }: DateFie
     <div className={className}>
       <label className="block text-xs font-semibold text-sand-900 mb-1">{label}</label>
       <div className="relative">
-        <input
+        <input aria-label={`${label} (DD/MM/YYYY)`}
           type="text"
           inputMode="numeric"
           autoComplete="off"

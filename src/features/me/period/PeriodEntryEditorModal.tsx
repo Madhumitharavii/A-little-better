@@ -57,7 +57,7 @@ export default function PeriodEntryEditorModal({ existing, onClose, onSave }: Pe
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Notes (optional)</label>
-          <textarea
+          <textarea aria-label="Notes (optional)"
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}

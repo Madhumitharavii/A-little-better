@@ -3,8 +3,7 @@
  * defined in supabase/migrations/0001_initial_schema.sql. These are
  * intentionally separate from the local Dexie entity types in
  * src/db/schema.ts — see mapping.ts for the conversion functions
- * between the two. Nothing in the app currently reads or writes
- * these; this is groundwork for a future sync feature.
+ * between the two, and syncEngine.ts for where they're used.
  */
 
 export type SyncTableName =

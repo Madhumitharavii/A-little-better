@@ -46,6 +46,7 @@ export default function EpisodeRow({
 
         {editingTitle ? (
           <input
+            aria-label={`Episode ${episode.number} title`}
             autoFocus
             value={titleDraft}
             onChange={(e) => setTitleDraft(e.target.value)}

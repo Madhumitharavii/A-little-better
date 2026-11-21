@@ -43,7 +43,7 @@ export default function AppearanceTool({ date, onClose, showToast }: ReflectionT
       <div className="space-y-3 text-xs">
         <div>
           <label className="block font-semibold text-sand-900 mb-1">What am I telling myself?</label>
-          <input
+          <input aria-label="What am I telling myself?"
             type="text"
             value={tellingSelf}
             onChange={(e) => setTellingSelf(e.target.value)}
@@ -74,7 +74,7 @@ export default function AppearanceTool({ date, onClose, showToast }: ReflectionT
           <label className="block font-semibold text-sand-900 mb-1">
             What do I value about myself that has nothing to do with appearance?
           </label>
-          <input
+          <input aria-label="What do I value about myself that has nothing to do with appearance?"
             type="text"
             value={valuableQuality}
             onChange={(e) => setValuableQuality(e.target.value)}

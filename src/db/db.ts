@@ -8,6 +8,8 @@ import type {
   Person,
   PeriodEntry,
   AppSettings,
+  SyncTombstone,
+  ToolEvent,
 } from './schema';
 
 /**
@@ -29,6 +31,8 @@ class AppDatabase extends Dexie {
   people!: Table<Person, string>;
   periodEntries!: Table<PeriodEntry, string>;
   settings!: Table<AppSettings, string>;
+  syncTombstones!: Table<SyncTombstone, string>;
+  toolEvents!: Table<ToolEvent, string>;
 
   constructor() {
     super('a-little-better');
@@ -70,6 +74,37 @@ class AppDatabase extends Dexie {
       people: 'id, name, updatedAt, deletedAt',
       periodEntries: 'id, startDate, updatedAt, deletedAt',
       settings: 'id, updatedAt',
+    });
+
+    // Sync-deletions pass: one more purely additive store. Records
+    // local hard-deletes (care entries un-checked, images removed)
+    // until the next sync tells Supabase, so the deletion reaches
+    // other devices. Every existing store is repeated unchanged.
+    this.version(4).stores({
+      careEntries: 'id, date, itemKey, [date+itemKey], updatedAt',
+      dailyReflections: 'id, date, updatedAt',
+      journalEntries: 'id, date, sourceTool, updatedAt, deletedAt',
+      lifeItems: 'id, type, status, favorite, updatedAt, deletedAt, [type+deletedAt]',
+      lifeImages: 'id, createdAt',
+      people: 'id, name, updatedAt, deletedAt',
+      periodEntries: 'id, startDate, updatedAt, deletedAt',
+      settings: 'id, updatedAt',
+      syncTombstones: 'id, table',
+    });
+
+    // Advisor pass: a local-only log of "I'm bored" / "I'm scrolling"
+    // taps (never synced). Purely additive; everything else unchanged.
+    this.version(5).stores({
+      careEntries: 'id, date, itemKey, [date+itemKey], updatedAt',
+      dailyReflections: 'id, date, updatedAt',
+      journalEntries: 'id, date, sourceTool, updatedAt, deletedAt',
+      lifeItems: 'id, type, status, favorite, updatedAt, deletedAt, [type+deletedAt]',
+      lifeImages: 'id, createdAt',
+      people: 'id, name, updatedAt, deletedAt',
+      periodEntries: 'id, startDate, updatedAt, deletedAt',
+      settings: 'id, updatedAt',
+      syncTombstones: 'id, table',
+      toolEvents: 'id, tool, at',
     });
   }
 }

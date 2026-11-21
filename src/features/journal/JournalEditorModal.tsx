@@ -37,7 +37,7 @@ export default function JournalEditorModal({ existing, onClose, onSave }: Journa
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Title (optional)</label>
-          <input
+          <input aria-label="Title (optional)"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -48,7 +48,7 @@ export default function JournalEditorModal({ existing, onClose, onSave }: Journa
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">What's on your mind</label>
-          <textarea
+          <textarea aria-label="What's on your mind"
             rows={6}
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -77,7 +77,7 @@ export default function JournalEditorModal({ existing, onClose, onSave }: Journa
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Tags (optional, comma separated)</label>
-          <input
+          <input aria-label="Tags (optional, comma separated)"
             type="text"
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}

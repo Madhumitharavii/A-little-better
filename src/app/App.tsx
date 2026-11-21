@@ -7,24 +7,46 @@ import { useToast } from '@/shared/hooks/useToast';
 import TodayPage from '@/features/today/TodayPage';
 import JournalPage from '@/features/journal/JournalPage';
 import MePage from '@/features/me/MePage';
+import SettingsPage from '@/features/settings/SettingsPage';
+import StudyTimerPill from '@/features/study/StudyTimerPill';
+import NoticedButton from '@/features/advisor/NoticedButton';
 import LifePage from '@/features/life/LifePage';
 import WeekPage from '@/features/week/WeekPage';
 import { checkReminders } from '@/shared/utils/reminders';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { runSync } from '@/lib/sync/syncEngine';
+import { subscribePasswordRecovery } from '@/lib/sync/authService';
+import { applyTheme, onSystemThemeChange } from '@/shared/utils/theme';
 
-const PILLARS = [
-  { label: 'CARE', color: 'bg-sage-500' },
-  { label: 'LOVE', color: 'bg-terracotta-400' },
-  { label: 'REFLECT', color: 'bg-slate-500' },
-  { label: 'GROW', color: 'bg-amber-500' },
-];
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<TabId>('today');
+  // The five tabs, plus Settings (opened from the ⚙️ button, not a tab).
+  const [currentTab, setCurrentTab] = useState<TabId | 'settings'>('today');
+  // Where ← Back on Settings returns to.
+  const [lastTab, setLastTab] = useState<TabId>('today');
   const { toastMessage, showToast } = useToast();
 
   const settings = useLiveQuery(() => getSettings(), []);
+
+  // Light / dark / match device (Me → Appearance). Re-applied when the
+  // device itself switches, for the "match device" choice.
+  const themeChoice = settings?.theme;
+  useEffect(() => {
+    if (!settings) return;
+    applyTheme(themeChoice);
+    return onSystemThemeChange(() => applyTheme(themeChoice));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themeChoice, !!settings]);
+
+  // Opening a password-reset email link lands on the app's home page;
+  // jump straight to Settings, where the "Set a new password" form appears.
+  useEffect(
+    () =>
+      subscribePasswordRecovery((pending) => {
+        if (pending) setCurrentTab('settings');
+      }),
+    [],
+  );
 
   // Best-effort reminders: checked whenever the app is opened or
   // brought back to the foreground — see shared/utils/reminders.ts
@@ -104,13 +126,13 @@ export default function App() {
               <h1 className="font-serif text-xl font-semibold text-sand-900 tracking-tight">
                 A Little Better
               </h1>
-              <p className="text-[11px] text-sand-800/70 font-medium tracking-wide uppercase">
-                Private Life-Care Space
+              <p className="text-[11px] text-sand-800/70 font-medium italic font-serif">
+                Don't optimize your life. Take care of it.
               </p>
             </div>
           </div>
 
-          <nav className="flex items-center bg-sand-100 p-1 rounded-2xl text-xs font-medium text-sand-800 flex-wrap">
+          <nav className="flex items-center bg-slate-100 p-1 rounded-2xl text-xs font-medium text-sand-800 flex-wrap">
             {TABS.map((tab) => {
               const isActive = currentTab === tab.id;
               return (
@@ -119,13 +141,14 @@ export default function App() {
                   onClick={() => {
                     if (tab.implemented) {
                       setCurrentTab(tab.id);
+                      setLastTab(tab.id);
                     } else {
                       showToast(`The '${tab.label}' sanctuary is being prepared.`);
                     }
                   }}
                   className={`px-3 py-2 rounded-xl capitalize transition-all ${
                     isActive
-                      ? 'bg-white text-sand-900 shadow-sm font-semibold'
+                      ? 'bg-white text-terracotta-600 shadow-sm font-semibold'
                       : tab.implemented
                         ? 'hover:text-sand-900 text-sand-800/80'
                         : 'text-sand-800/40 cursor-not-allowed'
@@ -140,20 +163,34 @@ export default function App() {
         </div>
 
         <div className="mt-4 flex items-center justify-between flex-wrap gap-2 text-[11px] text-sand-800/70 font-medium border-t border-sand-100 pt-3">
-          <div className="flex items-center gap-4">
-            {PILLARS.map((p) => (
-              <span key={p.label} className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${p.color}`}></span> {p.label}
-              </span>
-            ))}
-          </div>
+          {/* Today's advice from any tab — with a dot when there's something new. */}
+          <NoticedButton />
 
-          <button
-            onClick={toggleSound}
-            className="text-[11px] text-sand-800/60 hover:text-sand-900 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sand-100/60 transition-colors"
-          >
-            <span>{settings?.soundEnabled ? '🔔 Chimes On' : '🔇 Quiet Mode'}</span>
-          </button>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <StudyTimerPill
+              onOpen={() => {
+                setCurrentTab('week');
+                setLastTab('week');
+              }}
+            />
+            <button
+              onClick={toggleSound}
+              className="text-[11px] text-terracotta-600 hover:text-terracotta-600/80 font-semibold flex items-center gap-1 px-2 py-0.5 rounded-lg bg-terracotta-100/70 transition-colors"
+            >
+              <span>{settings?.soundEnabled ? '🔔 Chimes On' : '🔇 Quiet Mode'}</span>
+            </button>
+            <button
+              onClick={() => setCurrentTab(currentTab === 'settings' ? lastTab : 'settings')}
+              aria-pressed={currentTab === 'settings'}
+              className={`text-[11px] flex items-center gap-1 px-2 py-0.5 rounded-lg transition-colors ${
+                currentTab === 'settings'
+                  ? 'bg-white shadow-sm text-sand-900 font-semibold'
+                  : 'bg-slate-100 text-slate-800 hover:text-slate-900'
+              }`}
+            >
+              <span aria-hidden="true">⚙️</span> Settings
+            </button>
+          </div>
         </div>
       </header>
 
@@ -161,16 +198,13 @@ export default function App() {
 
       <main className="mt-8">
         {currentTab === 'today' && <TodayPage showToast={showToast} soundEnabled={!!settings?.soundEnabled} />}
-        {currentTab === 'week' && <WeekPage />}
+        {currentTab === 'week' && <WeekPage showToast={showToast} />}
         {currentTab === 'life' && <LifePage showToast={showToast} />}
         {currentTab === 'journal' && <JournalPage showToast={showToast} />}
         {currentTab === 'me' && <MePage showToast={showToast} />}
+        {currentTab === 'settings' && <SettingsPage showToast={showToast} onBack={() => setCurrentTab(lastTab)} />}
       </main>
 
-      <footer className="mt-16 pt-6 border-t border-sand-200 text-center text-xs text-sand-800/60 space-y-1">
-        <p className="font-serif italic text-sand-800/80">"Don't optimize your life. Take care of it."</p>
-        <p className="text-[11px] text-sand-800/50">Your little corner of the internet. Your data stays on this device.</p>
-      </footer>
     </div>
   );
 }

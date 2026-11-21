@@ -88,22 +88,33 @@ export default function LifePage({ showToast }: LifePageProps) {
         </section>
       ) : (
         <>
-          <section className="grid grid-cols-2 gap-3 sm:gap-4">
-            {categoryCards.map((cat) => (
-              <button
-                key={cat.view}
-                onClick={() => setView(cat.view)}
-                className={`p-5 sm:p-6 rounded-3xl border card-transition text-left shadow-sm hover:shadow-md ${cat.accent}`}
-              >
-                <span className="text-2xl block mb-2">{cat.icon}</span>
-                <p className="serif text-lg font-semibold text-sand-900">{cat.title}</p>
-                <p className="text-[11px] text-sand-800/60 mt-0.5">{cat.tagline}</p>
-                <p className="text-[11px] text-sand-800/50 mt-2">
-                  {cat.count} {cat.count === 1 ? 'entry' : 'entries'}
-                </p>
-              </button>
-            ))}
-          </section>
+          {[
+            { heading: 'My archive', note: '', cards: categoryCards.slice(0, 5) },
+            { heading: 'Looking ahead', note: 'Things to try and this year\'s vision', cards: categoryCards.slice(5) },
+          ].map((group) => (
+            <section key={group.heading} className="space-y-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60">{group.heading}</h3>
+                {group.note && <span className="text-[11px] text-sand-800/50 text-right">{group.note}</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {group.cards.map((cat) => (
+                  <button
+                    key={cat.view}
+                    onClick={() => setView(cat.view)}
+                    className={`p-5 sm:p-6 rounded-3xl border card-transition text-left shadow-sm hover:shadow-md ${cat.accent}`}
+                  >
+                    <span className="text-2xl block mb-2">{cat.icon}</span>
+                    <p className="serif text-lg font-semibold text-sand-900">{cat.title}</p>
+                    <p className="text-[11px] text-sand-800/60 mt-0.5">{cat.tagline}</p>
+                    <p className="text-[11px] text-sand-800/50 mt-2">
+                      {cat.count} {cat.count === 1 ? 'entry' : 'entries'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
 
           {recentlyAdded.length > 0 && (
             <section className="space-y-2">

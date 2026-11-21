@@ -1,3 +1,4 @@
+import { recordTombstone } from './syncTombstoneRepository';
 import { db } from '../db';
 import { generateId, nowIso } from '../id';
 import type { LifeImage } from '../schema';
@@ -16,4 +17,8 @@ export async function getLifeImage(id: string): Promise<LifeImage | undefined> {
 
 export async function deleteLifeImage(id: string): Promise<void> {
   await db.lifeImages.delete(id);
+  // Lets the deletion reach Supabase (and so other devices) on the
+  // next sync — otherwise the remote copy would linger, and another
+  // device would keep or even re-download the photo.
+  await recordTombstone('life_images', id);
 }

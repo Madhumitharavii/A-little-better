@@ -58,6 +58,7 @@ export default function SeriesPage({ showToast, onBack, initialOpenItem }: Serie
       </div>
 
       <input
+        aria-label="Search your series"
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

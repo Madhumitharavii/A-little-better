@@ -10,6 +10,14 @@ import { deleteLifeImage } from './lifeImageRepository';
  * from inside a Dexie liveQuery querier because they never write.
  */
 
+/**
+ * The Life categories. The same table also holds study subjects and
+ * sessions (shown on Week), so every Life read filters to these.
+ */
+export const LIFE_ITEM_TYPES: readonly LifeItemType[] = ['book', 'movie', 'series', 'artwork', 'experience', 'wish'];
+const isLifeItem = (item: { type: string; deletedAt?: string | null }): item is LifeItem =>
+  !item.deletedAt && (LIFE_ITEM_TYPES as readonly string[]).includes(item.type);
+
 function sortKey(item: LifeItem): string {
   switch (item.type) {
     case 'book':
@@ -29,7 +37,7 @@ function sortKey(item: LifeItem): string {
 
 export async function getLifeItems(type?: LifeItemType): Promise<LifeItem[]> {
   const all = type ? await db.lifeItems.where('type').equals(type).toArray() : await db.lifeItems.toArray();
-  return all.filter((item) => !item.deletedAt).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+  return all.filter(isLifeItem).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
 }
 
 export async function getLifeItem(id: string): Promise<LifeItem | undefined> {
@@ -161,13 +169,13 @@ export async function searchLifeItems(query: string): Promise<LifeItem[]> {
   const trimmed = query.trim().toLowerCase();
   if (!trimmed) return [];
   const all = await db.lifeItems.toArray();
-  return all.filter((item) => !item.deletedAt && itemSearchText(item).includes(trimmed));
+  return all.filter((item) => isLifeItem(item) && itemSearchText(item).includes(trimmed));
 }
 
 export async function getRecentlyAdded(limit = 6): Promise<LifeItem[]> {
   const all = await db.lifeItems.toArray();
   return all
-    .filter((item) => !item.deletedAt)
+    .filter(isLifeItem)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, limit);
 }
@@ -185,7 +193,7 @@ export async function getLifeCounts(): Promise<LifeCounts> {
   const all = await db.lifeItems.toArray();
   const counts: LifeCounts = { book: 0, movie: 0, series: 0, artwork: 0, experience: 0, wish: 0 };
   for (const item of all) {
-    if (item.deletedAt) continue;
+    if (!isLifeItem(item)) continue;
     counts[item.type]++;
   }
   return counts;

@@ -9,7 +9,7 @@ function buildDefaultSettings(): AppSettings {
   return {
     id: SETTINGS_ID,
     soundEnabled: false,
-    theme: 'light',
+    theme: 'system',
     nightReminderEnabled: false,
     nightReminderTime: '22:30',
     morningReminderEnabled: false,
@@ -63,8 +63,6 @@ type SettingsPatch = Partial<
     | 'morningReminderTime'
     | 'lastNightReminderFiredDate'
     | 'lastMorningReminderFiredDate'
-    | 'deviceId'
-    | 'lastSyncedAt'
   >
 >;
 
@@ -75,11 +73,25 @@ export async function saveSettings(patch: SettingsPatch): Promise<AppSettings> {
   return updated;
 }
 
+type SyncBookkeepingPatch = Partial<Pick<AppSettings, 'deviceId' | 'lastSyncedAt' | 'syncCursors'>>;
+
+/**
+ * Saves sync's own local bookkeeping WITHOUT touching `updatedAt`.
+ * `updatedAt` is what last-write-wins compares when syncing settings
+ * between devices, so it must only move when the person actually
+ * changes a setting — otherwise every sync would make this device's
+ * (possibly stale) settings look "newest" and overwrite a real change
+ * made on another device.
+ */
+export async function saveSyncBookkeeping(patch: SyncBookkeepingPatch): Promise<void> {
+  await ensureDefaultSettings();
+  await db.settings.update(SETTINGS_ID, patch);
+}
+
 /**
  * Returns this device's sync id, generating and persisting one on
- * first call if none exists yet. Not called anywhere in the app yet —
- * this exists for the sync foundation in src/lib/sync, so it's ready
- * once two-way sync is actually built.
+ * first call if none exists yet (used by syncEngine to tag rows with
+ * the device that wrote them).
  */
 export async function ensureDeviceId(): Promise<string> {
   const current = await getSettings();
@@ -88,7 +100,6 @@ export async function ensureDeviceId(): Promise<string> {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `device-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  await ensureDefaultSettings();
-  await saveSettings({ deviceId });
+  await saveSyncBookkeeping({ deviceId });
   return deviceId;
 }

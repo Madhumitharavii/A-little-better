@@ -61,7 +61,7 @@ export default function PeriodImportModal({ onClose, onImported }: PeriodImportM
 
           <div>
             <label className="block font-semibold text-sand-900 mb-1">Where is this from?</label>
-            <input
+            <input aria-label="Where is this from?"
               type="text"
               value={sourceLabel}
               onChange={(e) => setSourceLabel(e.target.value)}

@@ -130,7 +130,7 @@ export interface BookItem extends LifeItemBase {
   quote?: string;
   /** Earlier readings, oldest first — see BookReadingEntry. */
   previousReadings?: BookReadingEntry[];
-  /** Future-proofing for a Goodreads importer — not built yet. */
+  /** Where the record came from — 'goodreads' when added by the Goodreads CSV import (books/goodreadsImport.ts). */
   source?: 'manual' | 'goodreads';
 }
 
@@ -256,6 +256,52 @@ export interface WishItem extends LifeItemBase {
 export type LifeItem = BookItem | MovieItem | SeriesItem | ArtworkItem | ExperienceItem | WishItem;
 
 /**
+ * STUDY (shown on the Week page, not Life).
+ *
+ * Stored in the same `lifeItems` table (and synced the same way, as
+ * life_items rows with their fields in `payload`) so no database change
+ * was needed — but deliberately NOT part of the LifeItem union, and
+ * filtered out of every Life view (see LIFE_ITEM_TYPES).
+ *
+ * A subject carries its topics; every study session is its own row, so
+ * logging study on two devices at once can never overwrite either one.
+ */
+export type TopicStatus = 'notStarted' | 'learning' | 'confident';
+
+export interface StudyTopic {
+  id: string;
+  name: string;
+  status: TopicStatus;
+}
+
+export interface SubjectItem extends LifeItemBase {
+  type: 'subject';
+  icon?: string;
+  /** e.g. "JLPT N5" */
+  goal?: string;
+  /** Local date key the goal is aimed at, e.g. "2027-06-30". */
+  goalDate?: string;
+  /** In display order. */
+  topics: StudyTopic[];
+  /**
+   * Optional weekly goal (a week runs Monday–Sunday). Either or both:
+   * total study time, and/or how many different days to study.
+   */
+  weeklyGoal?: { minutes?: number; days?: number };
+}
+
+export interface StudySessionItem extends LifeItemBase {
+  type: 'studySession';
+  subjectId: string;
+  topicId?: string;
+  /** Local date key of the session, e.g. "2026-11-21". */
+  date: string;
+  minutes: number;
+}
+
+export type StudyItem = SubjectItem | StudySessionItem;
+
+/**
  * Omit<LifeItem, ...> or Partial<LifeItem> would silently collapse to
  * only the fields shared by all variants — TypeScript's keyof on a
  * union is the *intersection* of each member's keys, not the union of
@@ -283,11 +329,37 @@ export interface LifeImage {
   id: string;
   blob: Blob;
   createdAt: string;
-  /** Set once this image has been uploaded to Supabase Storage — prevents re-uploading on every sync. Unused until sync is wired up. */
+  /** Set once this image has been uploaded to Supabase Storage — prevents re-uploading on every sync. */
   remoteUploadedAt?: string;
 }
 
-/** Placeholder store for the future People section — no UI yet. */
+/**
+ * A record that something was hard-deleted locally, kept only until
+ * the next successful sync tells Supabase about it (so other devices
+ * learn about the deletion instead of keeping — or re-downloading —
+ * their copy). Only written when Supabase is configured; see
+ * src/lib/sync/syncEngine.ts pushTombstones.
+ */
+/**
+ * A tap on a Today "mindful redirect" button (I'm bored / I'm
+ * scrolling). Kept ONLY on this device — never synced — so the advisor
+ * can notice patterns like a lot of doom-scrolling this week.
+ */
+export interface ToolEvent {
+  id: string;
+  tool: 'bored' | 'scrolling';
+  at: string;
+}
+
+export interface SyncTombstone {
+  /** `${table}:${rowId}` — one tombstone per deleted row. */
+  id: string;
+  table: 'care_entries' | 'life_images';
+  rowId: string;
+  deletedAt: string;
+}
+
+/** Someone I want to stay connected with — see My People (Me page) and the Relationship Connection tool. */
 export interface Person {
   id: string;
   name: string;
@@ -328,7 +400,8 @@ export interface PeriodEntry {
 export interface AppSettings {
   id: 'app-settings';
   soundEnabled: boolean;
-  theme: 'light';
+  /** 'system' follows the device's light/dark setting. */
+  theme: 'light' | 'dark' | 'system';
   /** Reminders are best-effort local notifications — see remindersRepository for the honest limitations. */
   nightReminderEnabled?: boolean;
   nightReminderTime?: string; // "HH:MM", 24h
@@ -337,14 +410,26 @@ export interface AppSettings {
   lastNightReminderFiredDate?: string;
   lastMorningReminderFiredDate?: string;
   /**
-   * A random id generated once per device/install, used to tag which
-   * device last wrote a record — useful context for a future conflict
-   * view. Not currently written by any sync process; see
-   * src/lib/sync for the (not-yet-wired-up) foundation.
+   * A random id generated once per device/install, sent with every
+   * synced row as `device_id` so the server records which device last
+   * wrote it. Local-only bookkeeping — never synced as a setting.
    */
   deviceId?: string;
-  /** Timestamp of the last successful two-way sync — unused until sync is built. */
+  /**
+   * Local device clock time at which the last successful sync STARTED.
+   * Used only to decide which local rows changed since then and need
+   * pushing (both sides of that comparison are this device's clock).
+   * Local-only bookkeeping — never synced as a setting.
+   */
   lastSyncedAt?: string;
+  /**
+   * Per-table pull cursors: the newest server-assigned `synced_at`
+   * this device has pulled for each remote table. Pulls compare
+   * against the SERVER's clock only, so a device whose clock is off
+   * can never skip another device's changes. Local-only bookkeeping —
+   * never synced as a setting.
+   */
+  syncCursors?: Partial<Record<string, string>>;
   createdAt: string;
   updatedAt: string;
 }

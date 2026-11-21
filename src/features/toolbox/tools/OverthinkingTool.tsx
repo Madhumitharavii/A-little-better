@@ -62,7 +62,7 @@ export default function OverthinkingTool({ date, onClose, showToast }: Reflectio
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-sand-900 mb-1">1. What am I worried about?</label>
-            <textarea
+            <textarea aria-label="1. What am I worried about?"
               rows={2}
               value={worried}
               onChange={(e) => setWorried(e.target.value)}
@@ -75,7 +75,7 @@ export default function OverthinkingTool({ date, onClose, showToast }: Reflectio
             <div>
               <label className="block text-xs font-semibold text-sand-900 mb-1">2. What do I actually know?</label>
               <p className="text-[10px] text-sand-800/60 mb-1">Facts, proven right now</p>
-              <textarea
+              <textarea aria-label="2. What do I actually know?"
                 rows={2}
                 value={facts}
                 onChange={(e) => setFacts(e.target.value)}
@@ -86,7 +86,7 @@ export default function OverthinkingTool({ date, onClose, showToast }: Reflectio
             <div>
               <label className="block text-xs font-semibold text-sand-900 mb-1">3. What am I predicting?</label>
               <p className="text-[10px] text-sand-800/60 mb-1">Assumptions & worst-cases</p>
-              <textarea
+              <textarea aria-label="3. What am I predicting?"
                 rows={2}
                 value={predictions}
                 onChange={(e) => setPredictions(e.target.value)}
@@ -121,7 +121,7 @@ export default function OverthinkingTool({ date, onClose, showToast }: Reflectio
           {canAct === true && (
             <div className="p-3 bg-sage-100/50 rounded-2xl border border-sage-300 space-y-2">
               <label className="block text-xs font-semibold text-sand-900">What's one useful action I can take?</label>
-              <input
+              <input aria-label="What's one useful action I can take?"
                 type="text"
                 value={actionText}
                 onChange={(e) => setActionText(e.target.value)}

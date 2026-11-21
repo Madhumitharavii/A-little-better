@@ -1,4 +1,5 @@
 import type { ToolId } from './types';
+import { useRememberedToggle } from '@/shared/hooks/useRememberedToggle';
 
 interface ToolboxGridProps {
   openTool: (tool: ToolId) => void;
@@ -13,13 +14,26 @@ const TILES: Array<{ id: ToolId; icon: string; title: string; subtitle: string; 
 ];
 
 export default function ToolboxGrid({ openTool }: ToolboxGridProps) {
+  // Folded by default to keep Today calm; remembered per device.
+  const [open, setOpen] = useRememberedToggle('alb.today.resetToolsOpen', false);
   return (
     <section>
-      <div className="flex items-center justify-between mb-3">
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 text-left"
+      >
         <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60">When I Need a Reset</h3>
-        <span className="text-xs text-sand-800/50">Self-reflection & clarity</span>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <span className="text-xs text-sand-800/50 flex items-center gap-1.5 shrink-0">
+          <span className="hidden sm:inline">{open ? 'Self-reflection & clarity' : 'Procrastination, overthinking, anger…'}</span>
+          <span className="sm:hidden">{open ? 'Hide' : '5 tools'}</span>
+          <span aria-hidden="true" className={`inline-block transition-transform ${open ? 'rotate-180' : ''}`}>
+            ⌄
+          </span>
+        </span>
+      </button>
+      {open && (
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-3">
         {TILES.map((tile, i) => (
           <button
             key={tile.id}
@@ -36,6 +50,7 @@ export default function ToolboxGrid({ openTool }: ToolboxGridProps) {
           </button>
         ))}
       </div>
+      )}
     </section>
   );
 }

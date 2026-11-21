@@ -10,9 +10,12 @@ syncs across your own devices — see "How sync actually works" below.
   local Dexie entities (`src/db/schema.ts`), Row Level Security so
   each person can only ever see their own rows, and a private Storage
   bucket (`life-images`) for artwork/experience photos.
-- `migrations/0002_settings_unique_id.sql` — a small follow-up fix so
-  the generic sync push works for the `settings` table specifically
-  (see the comment inside the file for why).
+- `migrations/0002_settings_unique_id.sql` — **optional**. An earlier
+  fix for upserting the `settings` table. The app now upserts
+  `settings` on its real primary key `(user_id, id)` instead (see
+  `conflictTarget` in `src/lib/sync/syncService.ts`), so this
+  migration isn't needed — applying it is harmless either way. The
+  live project ("A little better") runs without it.
 - `src/lib/supabaseClient.ts` — a Supabase client that only
   initializes when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
   are set (see `.env.example`). Without them, the app runs exactly as
@@ -34,9 +37,6 @@ syncs across your own devices — see "How sync actually works" below.
 - No migration of pre-existing local data away from Dexie — Dexie
   remains the only thing the UI reads from directly; sync copies data
   to and from it in the background.
-- No propagation of local image *deletions* to other devices yet
-  (uploads and downloads work; a deleted local image just doesn't
-  carry a "please delete this too" signal to remote yet).
 
 ## Applying the migrations
 
@@ -66,9 +66,10 @@ in that same order. Both migrations are written to be safe to re-run
   shared columns (`type`, `title`, `favorite`, `notes`) are still real
   columns so you can query/filter by them directly.
 - **`synced_at` is server-assigned**, via a trigger, separate from the
-  client-controlled `updated_at`. A future incremental pull should
-  compare against `synced_at`, not `updated_at`, so it's never affected
-  by clock skew between two devices.
+  client-controlled `updated_at`. Incremental pulls compare only
+  against `synced_at` (per-table cursors stored on each device), so
+  they're never affected by clock skew between two devices — see
+  "Two clocks" in `syncEngine.ts`.
 - **Soft deletes everywhere** (`deleted_at`), matching the local app's
   existing pattern — a deletion needs to be something the other device
   can learn about, not just a row that silently disappears.
@@ -104,14 +105,13 @@ remote soft-delete is applied the same way (only when newer), so it
 can't resurrect an older local copy, but also can't silently discard
 a newer local edit made after the delete was recorded elsewhere.
 
-**Known limitation**: `care_entries` and `daily_reflections` don't
-have a `deletedAt` field in the local schema at all (no local delete
-path was ever built for daily reflections, and the one local delete
-path for care entries — un-checking a "Not today" item — is a hard
-delete). Creates and updates to those two tables sync correctly, but
-a local hard-delete doesn't currently propagate as a deletion to
-other devices. This is a narrow, pre-existing gap in the local
-schema, not something introduced by sync.
+**Hard-deleted tables**: care entries (un-checking an item) and
+images are hard-deleted locally, with no `deletedAt` field. Those
+deletions are recorded as local tombstones (`syncTombstones` store,
+`src/db/repositories/syncTombstoneRepository.ts`) and pushed at the
+start of the next sync as remote soft-deletes; a pulled remote
+deletion for those tables deletes the local row. (Daily reflections
+have no local delete path at all, so there's nothing to propagate.)
 
 ## Image sync
 
@@ -120,6 +120,6 @@ once each, tracked via a local `remoteUploadedAt` flag so re-running
 sync never re-uploads the same photo. Remote images not yet present
 on a device are downloaded automatically. A photo always displays
 immediately from whatever's already local, regardless of where it is
-in its sync — nothing waits on the network to render. Local image
-*deletion* doesn't yet propagate to other devices (see "What this is
-NOT" above).
+in its sync — nothing waits on the network to render. Deleting a
+photo marks its row deleted remotely and removes the file from
+Storage on the next sync; other devices then drop their copy.

@@ -33,7 +33,7 @@ export default function TemperTool({ date, onClose, showToast }: ReflectionToolP
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-sand-900 mb-1">1. What happened?</label>
-            <input
+            <input aria-label="1. What happened?"
               type="text"
               value={happened}
               onChange={(e) => setHappened(e.target.value)}
@@ -43,7 +43,7 @@ export default function TemperTool({ date, onClose, showToast }: ReflectionToolP
           </div>
           <div>
             <label className="block text-xs font-semibold text-sand-900 mb-1">2. What am I feeling right now?</label>
-            <input
+            <input aria-label="2. What am I feeling right now?"
               type="text"
               value={feeling}
               onChange={(e) => setFeeling(e.target.value)}
@@ -53,7 +53,7 @@ export default function TemperTool({ date, onClose, showToast }: ReflectionToolP
           </div>
           <div>
             <label className="block text-xs font-semibold text-sand-900 mb-1">3. What do I want to do right now?</label>
-            <input
+            <input aria-label="3. What do I want to do right now?"
               type="text"
               value={impulse}
               onChange={(e) => setImpulse(e.target.value)}
@@ -65,7 +65,7 @@ export default function TemperTool({ date, onClose, showToast }: ReflectionToolP
             <label className="block text-xs font-semibold text-sand-900 mb-1">
               4. What would my calm self wish I'd done, looking back tomorrow?
             </label>
-            <input
+            <input aria-label="4. What would my calm self wish I'd done, looking back tomorrow?"
               type="text"
               value={futureSelf}
               onChange={(e) => setFutureSelf(e.target.value)}

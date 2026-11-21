@@ -17,7 +17,7 @@ interface JournalEntryCardProps {
 
 export default function JournalEntryCard({ entry, onEdit, onDelete }: JournalEntryCardProps) {
   return (
-    <div className="bg-white p-4 sm:p-5 rounded-3xl border border-sand-200 shadow-sm space-y-2">
+    <div className="bg-white p-4 sm:p-5 rounded-3xl border border-sand-200 border-l-4 border-l-slate-500/50 shadow-sm space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-wider font-semibold text-terracotta-600">

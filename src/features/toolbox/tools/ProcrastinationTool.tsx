@@ -30,7 +30,7 @@ export default function ProcrastinationTool({ date, onClose, showToast, openTool
           </p>
           <div>
             <label className="block text-xs font-semibold text-sand-900 mb-1">What am I avoiding right now?</label>
-            <input
+            <input aria-label="What am I avoiding right now?"
               type="text"
               value={avoiding}
               onChange={(e) => setAvoiding(e.target.value)}
@@ -53,7 +53,7 @@ export default function ProcrastinationTool({ date, onClose, showToast, openTool
           <div>
             <label className="block text-xs font-semibold text-sand-900 mb-1">Why does starting feel difficult?</label>
             <p className="text-[11px] text-sand-800/60 mb-2">Is it boring? Unclear? Too big?</p>
-            <input
+            <input aria-label="Why does starting feel difficult?"
               type="text"
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value)}
@@ -78,7 +78,7 @@ export default function ProcrastinationTool({ date, onClose, showToast, openTool
               What's the smallest possible first action?
             </label>
             <p className="text-[11px] text-sand-800/60 mb-2">Something so tiny it feels easy (e.g., "Open the document").</p>
-            <input
+            <input aria-label="What's the smallest possible first action?"
               type="text"
               value={microAction}
               onChange={(e) => setMicroAction(e.target.value)}

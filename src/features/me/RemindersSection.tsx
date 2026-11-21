@@ -19,7 +19,7 @@ export default function RemindersSection() {
   if (!settings) return null;
 
   return (
-    <div className="p-3 bg-sand-50 rounded-2xl border border-sand-200 space-y-3">
+    <div className="p-3 bg-slate-100/70 rounded-2xl border border-slate-500/20 space-y-3">
       <div>
         <p className="font-semibold text-sand-900 text-xs">🔔 Reminders</p>
         <p className="text-[11px] text-sand-800/60">
@@ -47,6 +47,7 @@ export default function RemindersSection() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <input
+            aria-label="Wind-down reminder time"
             type="time"
             value={settings.nightReminderTime ?? '22:30'}
             onChange={(e) => saveSettings({ nightReminderTime: e.target.value })}
@@ -71,6 +72,7 @@ export default function RemindersSection() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <input
+            aria-label="Get-up reminder time"
             type="time"
             value={settings.morningReminderTime ?? '07:00'}
             onChange={(e) => saveSettings({ morningReminderTime: e.target.value })}

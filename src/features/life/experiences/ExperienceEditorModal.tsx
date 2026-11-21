@@ -44,7 +44,7 @@ export default function ExperienceEditorModal({ existing, onClose, onSave }: Exp
       <div className="space-y-4 text-xs">
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Title</label>
-          <input
+          <input aria-label="Title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -57,7 +57,7 @@ export default function ExperienceEditorModal({ existing, onClose, onSave }: Exp
           <DateField label="Date (optional)" value={date} onChange={setDate} />
           <div>
             <label className="block font-semibold text-sand-900 mb-1">Location (optional)</label>
-            <input
+            <input aria-label="Location (optional)"
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
@@ -69,7 +69,7 @@ export default function ExperienceEditorModal({ existing, onClose, onSave }: Exp
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Who was there (optional)</label>
-          <input
+          <input aria-label="Who was there (optional)"
             type="text"
             value={people}
             onChange={(e) => setPeople(e.target.value)}
@@ -80,7 +80,7 @@ export default function ExperienceEditorModal({ existing, onClose, onSave }: Exp
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">What happened</label>
-          <textarea
+          <textarea aria-label="What happened"
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -91,7 +91,7 @@ export default function ExperienceEditorModal({ existing, onClose, onSave }: Exp
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Favorite memory (optional)</label>
-          <textarea
+          <textarea aria-label="Favorite memory (optional)"
             rows={2}
             value={favoriteMemory}
             onChange={(e) => setFavoriteMemory(e.target.value)}

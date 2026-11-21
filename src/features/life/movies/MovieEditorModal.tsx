@@ -50,7 +50,7 @@ export default function MovieEditorModal({ existing, onClose, onSave }: MovieEdi
         <div className="grid grid-cols-[1fr,100px] gap-3">
           <div>
             <label className="block font-semibold text-sand-900 mb-1">Title</label>
-            <input
+            <input aria-label="Title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -60,7 +60,7 @@ export default function MovieEditorModal({ existing, onClose, onSave }: MovieEdi
           </div>
           <div>
             <label className="block font-semibold text-sand-900 mb-1">Year</label>
-            <input
+            <input aria-label="Year"
               type="number"
               value={year}
               onChange={(e) => setYear(e.target.value)}
@@ -91,7 +91,7 @@ export default function MovieEditorModal({ existing, onClose, onSave }: MovieEdi
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">My thoughts</label>
-          <textarea
+          <textarea aria-label="My thoughts"
             rows={3}
             value={review}
             onChange={(e) => setReview(e.target.value)}

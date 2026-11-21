@@ -39,6 +39,7 @@ function SeasonTitle({ season, onRename }: { season: Season; onRename: (title: s
   if (editing) {
     return (
       <input
+        aria-label={`Season ${season.number} name`}
         autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}

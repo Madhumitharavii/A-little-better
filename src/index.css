@@ -2,6 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Palette. Tailwind's sand / sage / terracotta / slate colours read
+ * these variables (see tailwind.config.ts), so dark mode swaps the
+ * whole app's palette here. Values are "R G B" so /opacity works.
+ *
+ * Light: a pure white background, with mint (sage), coral
+ * (terracotta) and periwinkle (slate) carrying the colour.
+ */
+:root {
+  --c-sand-50: 255 255 255;
+  --c-sand-100: 246 245 242;
+  --c-sand-200: 233 230 225;
+  --c-sand-300: 214 208 200;
+  --c-sand-800: 68 62 56;
+  --c-sand-900: 36 31 27;
+  --c-sage-100: 224 246 235;
+  --c-sage-300: 160 222 190;
+  --c-sage-500: 46 166 117;
+  --c-sage-700: 26 112 76;
+  --c-terracotta-100: 255 232 223;
+  --c-terracotta-400: 244 106 74;
+  --c-terracotta-600: 214 72 44;
+  --c-slate-100: 233 239 255;
+  --c-slate-500: 92 106 214;
+  --c-slate-800: 58 64 150;
+  --c-slate-900: 42 46 118;
+  /* Cards (bg-white in light mode). */
+  --c-surface: 255 255 255;
+  color-scheme: light;
+}
+
+/* Dark mode: the same palette, by lamplight. */
+.dark {
+  --c-sand-50: 23 20 17;
+  --c-sand-100: 37 33 28;
+  --c-sand-200: 58 51 44;
+  --c-sand-300: 84 74 63;
+  --c-sand-800: 214 204 192;
+  --c-sand-900: 243 237 230;
+  --c-sage-100: 30 44 38;
+  --c-sage-300: 62 94 81;
+  --c-sage-500: 92 198 150;
+  --c-sage-700: 160 226 196;
+  --c-terracotta-100: 60 36 28;
+  --c-terracotta-400: 244 112 82;
+  --c-terracotta-600: 250 145 115;
+  --c-slate-100: 36 39 48;
+  --c-slate-500: 150 162 240;
+  --c-slate-800: 200 206 250;
+  --c-slate-900: 226 228 238;
+  --c-surface: 31 27 23;
+  color-scheme: dark;
+}
+
+/* White cards become the dark surface (text-white on buttons stays white). */
+.dark .bg-white { background-color: rgb(var(--c-surface)); }
+.dark .bg-white\/90 { background-color: rgb(var(--c-surface) / 0.9); }
+.dark .hover\:bg-white:hover { background-color: rgb(var(--c-surface)); }
+
+/* "Ink" buttons (dark fill + white text) invert to a light fill with dark text. */
+.dark .text-white.bg-sand-900,
+.dark .text-white.bg-slate-800,
+.dark .text-white.hover\:bg-slate-900:hover,
+.dark .text-white.hover\:bg-sand-800:hover {
+  color: rgb(var(--c-sand-50));
+}
+
+/* Dialog backdrops stay a dim shade rather than a light wash. */
+.dark .bg-sand-900\/40 { background-color: rgb(0 0 0 / 0.55); }
+.dark .bg-sand-900\/70 { background-color: rgb(0 0 0 / 0.7); }
+
+/* The few stock Tailwind colours the app uses, tuned for dark. */
+.dark .bg-amber-50,
+.dark .hover\:bg-amber-50:hover { background-color: rgb(58 44 20); }
+.dark .border-amber-300\/50 { border-color: rgb(146 108 40 / 0.5); }
+.dark .text-amber-700 { color: rgb(245 196 110); }
+.dark .text-amber-600 { color: rgb(240 184 90); }
+.dark .bg-slate-200,
+.dark .hover\:bg-slate-200:hover { background-color: rgb(52 56 68); }
+.dark .border-slate-300 { border-color: rgb(70 75 90); }
+.dark .border-slate-400 { border-color: rgb(95 101 118); }
+.dark .text-slate-700 { color: rgb(205 208 226); }
+
 html {
   /* Prevents iOS Safari/PWA from auto-zooming on input focus when
      font-size is below 16px, without forcing every input to 16px. */
@@ -9,8 +92,8 @@ html {
 }
 
 body {
-  background-color: #faf8f5;
-  color: #2c2620;
+  background-color: rgb(var(--c-sand-50));
+  color: rgb(var(--c-sand-900));
   font-family: 'Plus Jakarta Sans', sans-serif;
   -webkit-tap-highlight-color: transparent;
   /* Respect the notch / home indicator when installed as a PWA on iOS. */
@@ -32,16 +115,16 @@ body {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #faf8f5;
+  background: rgb(var(--c-sand-50));
 }
 ::-webkit-scrollbar-thumb {
-  background: #d5c7b7;
+  background: rgb(var(--c-sand-300));
   border-radius: 999px;
 }
 
 /* Visible keyboard focus everywhere — quiet but present */
 :focus-visible {
-  outline: 2px solid #6c9a8b;
+  outline: 2px solid rgb(var(--c-sage-500));
   outline-offset: 2px;
   border-radius: 0.5rem;
 }

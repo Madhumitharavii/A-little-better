@@ -49,7 +49,7 @@ export default function SeriesEditorModal({ existing, onClose, onSave }: SeriesE
       <div className="space-y-4 text-xs">
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Title</label>
-          <input
+          <input aria-label="Title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -90,7 +90,7 @@ export default function SeriesEditorModal({ existing, onClose, onSave }: SeriesE
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">My thoughts</label>
-          <textarea
+          <textarea aria-label="My thoughts"
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}

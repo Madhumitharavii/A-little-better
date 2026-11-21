@@ -55,7 +55,7 @@ export default function BookEditorModal({ existing, onClose, onSave }: BookEdito
       <div className="space-y-4 text-xs">
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Title</label>
-          <input
+          <input aria-label="Title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -66,7 +66,7 @@ export default function BookEditorModal({ existing, onClose, onSave }: BookEdito
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Author</label>
-          <input
+          <input aria-label="Author"
             type="text"
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
@@ -107,7 +107,7 @@ export default function BookEditorModal({ existing, onClose, onSave }: BookEdito
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">My thoughts</label>
-          <textarea
+          <textarea aria-label="My thoughts"
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -118,7 +118,7 @@ export default function BookEditorModal({ existing, onClose, onSave }: BookEdito
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Favorite quote (optional)</label>
-          <textarea
+          <textarea aria-label="Favorite quote (optional)"
             rows={2}
             value={quote}
             onChange={(e) => setQuote(e.target.value)}

@@ -61,7 +61,7 @@ export default function BackupSection({ showToast }: BackupSectionProps) {
   };
 
   return (
-    <div className="p-3 bg-sand-50 rounded-2xl border border-sand-200 space-y-3">
+    <div className="p-3 bg-amber-50 rounded-2xl border border-amber-300/50 space-y-3">
       <div>
         <p className="font-semibold text-sand-900 text-xs">Data Backup & Privacy</p>
         <p className="text-[11px] text-sand-800/60">Export or restore your private local data as a JSON file.</p>

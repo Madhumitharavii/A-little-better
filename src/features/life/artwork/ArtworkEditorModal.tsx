@@ -38,7 +38,7 @@ export default function ArtworkEditorModal({ existing, onClose, onSave }: Artwor
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Title (optional)</label>
-          <input
+          <input aria-label="Title (optional)"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -51,7 +51,7 @@ export default function ArtworkEditorModal({ existing, onClose, onSave }: Artwor
           <DateField label="Date (optional)" value={dateCreated} onChange={setDateCreated} />
           <div>
             <label className="block font-semibold text-sand-900 mb-1">Medium (optional)</label>
-            <input
+            <input aria-label="Medium (optional)"
               type="text"
               value={medium}
               onChange={(e) => setMedium(e.target.value)}
@@ -63,7 +63,7 @@ export default function ArtworkEditorModal({ existing, onClose, onSave }: Artwor
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Notes (optional)</label>
-          <textarea
+          <textarea aria-label="Notes (optional)"
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}

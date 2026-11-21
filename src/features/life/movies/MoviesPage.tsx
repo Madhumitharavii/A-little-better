@@ -68,6 +68,7 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
       </div>
 
       <input
+        aria-label="Search your movies"
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

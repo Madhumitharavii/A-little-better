@@ -1,10 +1,19 @@
 import type { Table } from 'dexie';
 import { db } from '@/db/db';
 import { nowIso } from '@/db/id';
-import { getSettings, saveSettings, ensureDeviceId } from '@/db/repositories/settingsRepository';
+import { getSettings, saveSyncBookkeeping, ensureDeviceId } from '@/db/repositories/settingsRepository';
+import { listTombstones, clearTombstone, recordTombstone } from '@/db/repositories/syncTombstoneRepository';
 import { isSupabaseConfigured } from '@/lib/supabaseClient';
 import { getCurrentUserId } from './authService';
-import { pushRow, pushRows, pullRowsSince, uploadImageBlob, downloadImageBlob } from './syncService';
+import {
+  pushRow,
+  pushRows,
+  pullRowsSince,
+  softDeleteRow,
+  uploadImageBlob,
+  downloadImageBlob,
+  deleteImageBlob,
+} from './syncService';
 import * as mapping from './mapping';
 import type {
   RemoteCareEntry,
@@ -15,6 +24,7 @@ import type {
   RemotePerson,
   RemotePeriodEntry,
   RemoteSettings,
+  SyncTableName,
 } from './types';
 import type { CareEntry, DailyReflection, JournalEntry, LifeItem, Person, PeriodEntry } from '@/db/schema';
 
@@ -24,7 +34,7 @@ import type { CareEntry, DailyReflection, JournalEntry, LifeItem, Person, Period
  * gets called (startup, foreground, periodic, connectivity-restored)
  * and AccountSection.tsx for the sign-in UI and manual "Sync now".
  *
- * ── Conflict rule (documented briefly, per the spec) ──
+ * ── Conflict rule ──
  * Every table pushes local rows changed since the last successful
  * sync, then pulls remote rows changed since then. For each pulled
  * row: if there's no local row, create it (unless it's already
@@ -38,16 +48,37 @@ import type { CareEntry, DailyReflection, JournalEntry, LifeItem, Person, Period
  * updatedAt — deliberately not a CRDT; simple and sufficient for one
  * person's own devices.
  *
+ * ── Two clocks, never mixed ──
+ * PUSH decides "what changed here since last time" by comparing local
+ * rows' updatedAt to `lastSyncedAt` — both written by this device's
+ * own clock. `lastSyncedAt` is the time the last successful sync
+ * STARTED, so an edit made while a sync is running is still pushed
+ * next time instead of falling into a gap.
+ * PULL decides "what changed on the server since last time" using
+ * per-table cursors holding the newest SERVER-assigned `synced_at`
+ * already pulled — never this device's clock — so a phone whose clock
+ * is a few minutes off can't skip another device's changes. Each pull
+ * also re-reads a small overlap window before the cursor, to catch a
+ * row whose transaction committed just after an earlier pull read the
+ * table; re-reading a row is harmless (it's only applied if newer).
+ *
+ * ── Deletions ──
+ * Soft-deleted tables (journal, people, period, LIFE) carry the
+ * deletion as an ordinary row update. Care entries and images are
+ * hard-deleted locally, so those deletions are recorded as local
+ * tombstones (syncTombstoneRepository) and pushed first as remote
+ * soft-deletes — and images are also removed from Storage. Pulled
+ * remote deletions for those tables delete the local row.
+ *
  * ── First-sync safety ──
- * Every table syncs push-then-pull. On a device's very first sync
- * (no lastSyncedAt yet), "push" means "push everything local" — so
- * existing local-only data reaches Supabase before the pull can run,
- * even if the remote account is currently empty. The pull that
- * follows then only ever ADDS missing rows or applies strictly-newer
- * ones; it never clears anything. An empty remote account can never
- * wipe a device that already has data, and a device with an empty
- * local database correctly receives everything already in the
- * account.
+ * On a device's very first sync (no lastSyncedAt yet), "push" means
+ * "push everything local" — so existing local-only data reaches
+ * Supabase before the pull can run, even if the remote account is
+ * currently empty. The pull that follows then only ever ADDS missing
+ * rows or applies strictly-newer ones; it never clears anything. An
+ * empty remote account can never wipe a device that already has data,
+ * and a device with an empty local database correctly receives
+ * everything already in the account.
  */
 
 export type SyncStatus = 'not_configured' | 'signed_out' | 'idle' | 'syncing' | 'synced' | 'offline' | 'error';
@@ -57,6 +88,9 @@ export interface SyncStatusInfo {
   lastSyncedAt?: string;
   errorMessage?: string;
 }
+
+/** How far before each pull cursor to re-read, to catch late-committing writes. */
+const PULL_OVERLAP_MS = 2 * 60 * 1000;
 
 let currentStatus: SyncStatusInfo = { status: isSupabaseConfigured ? 'signed_out' : 'not_configured' };
 const listeners = new Set<(info: SyncStatusInfo) => void>();
@@ -83,10 +117,66 @@ function isOnline(): boolean {
   return typeof navigator === 'undefined' || navigator.onLine !== false;
 }
 
+type Cursors = Partial<Record<SyncTableName, string>>;
+
+/**
+ * True when timestamp `a` is strictly later than `b`. Compares real
+ * times, not text: Postgres returns e.g. "…:16.12+00:00" while the
+ * app writes "…:16.120Z", and comparing those as strings can get the
+ * order wrong.
+ */
+function isLater(a: string, b: string): boolean {
+  return Date.parse(a) > Date.parse(b);
+}
+
+/** The `since` value to pull with: the table's server-clock cursor minus the overlap window (or undefined → full pull). */
+function pullSinceFor(cursors: Cursors, table: SyncTableName): string | undefined {
+  const cursor = cursors[table];
+  if (!cursor) return undefined;
+  const ms = Date.parse(cursor);
+  if (Number.isNaN(ms)) return undefined;
+  return new Date(ms - PULL_OVERLAP_MS).toISOString();
+}
+
+/** Advances a table's cursor to the newest server `synced_at` seen in a pull (never moves it backwards). */
+function advanceCursor(cursors: Cursors, table: SyncTableName, rows: { synced_at: string }[]): void {
+  let newest = cursors[table];
+  for (const row of rows) {
+    if (!newest || isLater(row.synced_at, newest)) newest = row.synced_at;
+  }
+  if (newest) cursors[table] = newest;
+}
+
+/**
+ * Tells Supabase about local hard-deletes recorded since the last
+ * sync (care entries un-checked, images removed). Runs before any
+ * table is pushed or pulled, so a deleted row can't be pulled back
+ * down in the same cycle. Each tombstone is cleared only once its
+ * remote soft-delete succeeded; a failure stops the sync and they're
+ * retried next time.
+ */
+async function pushTombstones(userId: string): Promise<void> {
+  const tombstones = await listTombstones();
+  for (const tombstone of tombstones) {
+    // Updating a row that never reached the server is a harmless no-op.
+    await softDeleteRow(tombstone.table, tombstone.rowId, tombstone.deletedAt);
+    if (tombstone.table === 'life_images') {
+      try {
+        await deleteImageBlob(`${userId}/${tombstone.rowId}`);
+      } catch {
+        // The row is already marked deleted, so no device will
+        // download it again; a leftover file in Storage is harmless
+        // and shouldn't block the rest of sync.
+      }
+    }
+    await clearTombstone(tombstone.id);
+  }
+}
+
 /** Generic push-then-pull for any table whose local/remote rows both carry id/updatedAt(-ish)/deleted fields in the same shape family. */
 async function syncTable<
   Local extends { id: string; updatedAt: string },
-  Remote extends { id: string; updated_at: string; deleted_at: string | null },
+  Remote extends { id: string; updated_at: string; deleted_at: string | null; synced_at: string },
 >(
   table: 'care_entries' | 'daily_reflections' | 'journal_entries' | 'people' | 'period_entries' | 'life_items',
   dexieTable: Table<Local, string>,
@@ -94,54 +184,102 @@ async function syncTable<
   fromRemote: (row: Remote) => Local,
   userId: string,
   deviceId: string | null,
-  sinceIso: string | undefined,
+  pushSinceIso: string | undefined,
+  cursors: Cursors,
+  /**
+   * False for tables whose local schema has no deletedAt (care entries,
+   * daily reflections): a newer remote soft-delete then removes the
+   * local row, instead of being written back as a live row.
+   */
+  localHasSoftDelete: boolean,
+  /**
+   * For tables that must hold at most one row per natural key (care
+   * entries: one per date + item). Returns a local row with the same
+   * natural key but a DIFFERENT id — which happens when two devices
+   * each ticked the same item for the same day before syncing.
+   */
+  findLocalTwin?: (remote: Remote) => Promise<Local | undefined>,
+  /** Table name used for tombstones when a duplicate twin is resolved. */
+  twinTombstoneTable?: 'care_entries',
 ): Promise<void> {
   // PUSH: local rows changed since the last sync (or everything, on
   // a first sync) go up first, so local-only data always reaches the
   // account before anything could be pulled over it.
   const allLocal = await dexieTable.toArray();
-  const toPush = sinceIso ? allLocal.filter((row) => row.updatedAt > sinceIso) : allLocal;
+  const toPush = pushSinceIso ? allLocal.filter((row) => isLater(row.updatedAt, pushSinceIso)) : allLocal;
   if (toPush.length > 0) {
     await pushRows(table, toPush.map((row) => toRemote(row, userId, deviceId)));
   }
 
   // PULL: only ever creates missing rows or applies strictly-newer ones.
-  const remoteRows = await pullRowsSince<Remote>(table, userId, sinceIso);
+  const remoteRows = await pullRowsSince<Remote>(table, userId, pullSinceFor(cursors, table));
   for (const remote of remoteRows) {
     const local = await dexieTable.get(remote.id);
     if (!local) {
       if (remote.deleted_at) continue;
+      const twin = findLocalTwin ? await findLocalTwin(remote) : undefined;
+      if (twin && twinTombstoneTable) {
+        // Two records for the same thing (e.g. "Bath" on the same day,
+        // ticked on two devices). Keep whichever was changed last;
+        // the other is removed here and marked deleted remotely on the
+        // next sync, so every device ends up with the same single row.
+        if (isLater(remote.updated_at, twin.updatedAt)) {
+          await dexieTable.delete(twin.id);
+          await recordTombstone(twinTombstoneTable, twin.id);
+          await dexieTable.put(fromRemote(remote));
+        } else {
+          await recordTombstone(twinTombstoneTable, remote.id);
+        }
+        continue;
+      }
       await dexieTable.put(fromRemote(remote));
       continue;
     }
-    if (remote.updated_at > local.updatedAt) {
-      await dexieTable.put(fromRemote(remote));
+    if (isLater(remote.updated_at, local.updatedAt)) {
+      if (remote.deleted_at && !localHasSoftDelete) {
+        await dexieTable.delete(remote.id);
+      } else {
+        await dexieTable.put(fromRemote(remote));
+      }
     }
     // else: local is newer or equal — keep local, do nothing.
   }
+  advanceCursor(cursors, table, remoteRows);
 }
 
 /**
  * Settings is a special case: exactly one row per user, and the
  * local singleton id ('app-settings') differs from the remote row's
  * id (the user's own id, by convention — see mapping.ts). Also,
- * deviceId/lastSyncedAt are local-only bookkeeping fields that never
- * exist on the remote row, so they must be preserved across a pull.
+ * deviceId/lastSyncedAt/syncCursors are local-only bookkeeping fields
+ * that never exist on the remote row, so they must be preserved
+ * across a pull.
  */
-async function syncSettings(userId: string, deviceId: string | null, sinceIso: string | undefined): Promise<void> {
+async function syncSettings(
+  userId: string,
+  deviceId: string | null,
+  pushSinceIso: string | undefined,
+  cursors: Cursors,
+): Promise<void> {
   const local = await getSettings();
-  if (!sinceIso || local.updatedAt > sinceIso) {
+  if (!pushSinceIso || isLater(local.updatedAt, pushSinceIso)) {
     await pushRow('settings', mapping.settingsToRemote(local, userId, deviceId));
   }
 
-  const remoteRows = await pullRowsSince<RemoteSettings>('settings', userId, sinceIso);
+  const remoteRows = await pullRowsSince<RemoteSettings>('settings', userId, pullSinceFor(cursors, 'settings'));
+  advanceCursor(cursors, 'settings', remoteRows);
   const remote = remoteRows.find((row) => row.id === userId) ?? remoteRows[0];
   if (!remote) return;
 
   const currentLocal = await getSettings();
-  if (remote.updated_at > currentLocal.updatedAt) {
+  if (isLater(remote.updated_at, currentLocal.updatedAt)) {
     const merged = mapping.settingsFromRemote(remote);
-    await db.settings.put({ ...merged, deviceId: currentLocal.deviceId, lastSyncedAt: currentLocal.lastSyncedAt });
+    await db.settings.put({
+      ...merged,
+      deviceId: currentLocal.deviceId,
+      lastSyncedAt: currentLocal.lastSyncedAt,
+      syncCursors: currentLocal.syncCursors,
+    });
   }
 }
 
@@ -149,18 +287,13 @@ async function syncSettings(userId: string, deviceId: string | null, sinceIso: s
  * Images: local blobs are uploaded once (tracked via
  * remoteUploadedAt, so re-running sync never re-uploads the same
  * image) and remote images not yet present locally are downloaded.
- * A book/movie/series cover or artwork/experience photo referencing
- * an image id keeps displaying locally the whole time regardless of
- * where that image is in its sync — see useLifeImageUrl, which
- * simply shows nothing until the blob exists locally.
- *
- * Known limitation: local image deletion is a hard delete (see
- * lifeImageRepository.ts) with no local trace afterward, so a
- * deletion doesn't currently propagate to other devices in this
- * pass — the remote copy and any device that already downloaded it
- * keep it until that's built.
+ * A remote image marked deleted is removed locally too. A
+ * book/movie/series cover or artwork/experience photo referencing an
+ * image id keeps displaying locally the whole time regardless of
+ * where that image is in its sync — see useLifeImageUrl, which simply
+ * shows nothing until the blob exists locally.
  */
-async function syncLifeImages(userId: string, deviceId: string | null, sinceIso: string | undefined): Promise<void> {
+async function syncLifeImages(userId: string, deviceId: string | null, cursors: Cursors): Promise<void> {
   const allLocalImages = await db.lifeImages.toArray();
   for (const image of allLocalImages) {
     if (image.remoteUploadedAt) continue;
@@ -179,10 +312,14 @@ async function syncLifeImages(userId: string, deviceId: string | null, sinceIso:
     await db.lifeImages.put({ ...image, remoteUploadedAt: timestamp });
   }
 
-  const remoteImages = await pullRowsSince<RemoteLifeImage>('life_images', userId, sinceIso);
+  const remoteImages = await pullRowsSince<RemoteLifeImage>('life_images', userId, pullSinceFor(cursors, 'life_images'));
   for (const remote of remoteImages) {
-    if (remote.deleted_at) continue;
     const existing = await db.lifeImages.get(remote.id);
+    if (remote.deleted_at) {
+      // Deleted on another device — drop this device's copy too.
+      if (existing) await db.lifeImages.delete(remote.id);
+      continue;
+    }
     if (existing) continue;
     try {
       const blob = await downloadImageBlob(remote.storage_path);
@@ -191,8 +328,44 @@ async function syncLifeImages(userId: string, deviceId: string | null, sinceIso:
       // A single image failing to download shouldn't break the rest
       // of sync — the referencing LIFE item still syncs fine; the
       // photo just won't show on this device until a later retry.
+      // (That retry needs a full re-read, so don't let the cursor
+      // move past this image.)
+      return;
     }
   }
+  advanceCursor(cursors, 'life_images', remoteImages);
+}
+
+/**
+ * Turns a raw Supabase/network error into a calm, plain sentence for
+ * the Me page. Whatever happened, local data is always safe — every
+ * change is saved on the device first and simply waits for the next
+ * successful sync.
+ */
+export function friendlySyncError(err: unknown): string {
+  const raw =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'object' && err && 'message' in err
+        ? String((err as { message: unknown }).message)
+        : '';
+  const text = raw.toLowerCase();
+  const code =
+    typeof err === 'object' && err && 'code' in err ? String((err as { code: unknown }).code) : '';
+
+  if (text.includes('failed to fetch') || text.includes('network') || text.includes('load failed')) {
+    return "Couldn't reach the cloud. Free Supabase projects pause after a week without use — if this keeps happening, resume the project in the Supabase dashboard. Your data is safe on this device and will sync once it's reachable.";
+  }
+  if (text.includes('jwt') || text.includes('token') || code === 'PGRST301' || code === '401') {
+    return 'Your sign-in has expired. Sign out and back in to keep syncing — nothing on this device is lost.';
+  }
+  if (code === '42501' || text.includes('permission denied') || text.includes('row-level security')) {
+    return "The cloud didn't allow this change (a permissions setting in Supabase). Your data is safe on this device.";
+  }
+  if (text.includes('bucket') || text.includes('storage')) {
+    return "A photo couldn't sync this time. Everything else is fine; it'll try again on the next sync.";
+  }
+  return "Sync didn't finish this time. Your data is safe on this device, and it'll try again shortly.";
 }
 
 let syncInFlight = false;
@@ -225,9 +398,15 @@ export async function runSync(): Promise<void> {
   setStatus({ status: 'syncing' });
 
   try {
+    // Captured BEFORE anything is pushed — see "Two clocks" above.
+    const startedAt = nowIso();
     const deviceId = await ensureDeviceId();
     const settingsBefore = await getSettings();
-    const sinceIso = settingsBefore.lastSyncedAt;
+    const pushSinceIso = settingsBefore.lastSyncedAt;
+    // Working copy; only saved if the whole cycle succeeds.
+    const cursors: Cursors = { ...(settingsBefore.syncCursors ?? {}) };
+
+    await pushTombstones(userId);
 
     await syncTable<CareEntry, RemoteCareEntry>(
       'care_entries',
@@ -236,7 +415,11 @@ export async function runSync(): Promise<void> {
       mapping.careEntryFromRemote,
       userId,
       deviceId,
-      sinceIso,
+      pushSinceIso,
+      cursors,
+      false,
+      (remote) => db.careEntries.where('[date+itemKey]').equals([remote.date, remote.item_key]).first(),
+      'care_entries',
     );
     await syncTable<DailyReflection, RemoteDailyReflection>(
       'daily_reflections',
@@ -245,7 +428,9 @@ export async function runSync(): Promise<void> {
       mapping.dailyReflectionFromRemote,
       userId,
       deviceId,
-      sinceIso,
+      pushSinceIso,
+      cursors,
+      false,
     );
     await syncTable<JournalEntry, RemoteJournalEntry>(
       'journal_entries',
@@ -254,7 +439,9 @@ export async function runSync(): Promise<void> {
       mapping.journalEntryFromRemote,
       userId,
       deviceId,
-      sinceIso,
+      pushSinceIso,
+      cursors,
+      true,
     );
     await syncTable<Person, RemotePerson>(
       'people',
@@ -263,7 +450,9 @@ export async function runSync(): Promise<void> {
       mapping.personFromRemote,
       userId,
       deviceId,
-      sinceIso,
+      pushSinceIso,
+      cursors,
+      true,
     );
     await syncTable<PeriodEntry, RemotePeriodEntry>(
       'period_entries',
@@ -272,7 +461,9 @@ export async function runSync(): Promise<void> {
       mapping.periodEntryFromRemote,
       userId,
       deviceId,
-      sinceIso,
+      pushSinceIso,
+      cursors,
+      true,
     );
     // LIFE — books, movies, series (seasons/episodes travel inside
     // each series' own payload, not as separate rows — see
@@ -285,17 +476,18 @@ export async function runSync(): Promise<void> {
       mapping.lifeItemFromRemote,
       userId,
       deviceId,
-      sinceIso,
+      pushSinceIso,
+      cursors,
+      true,
     );
 
-    await syncSettings(userId, deviceId, sinceIso);
-    await syncLifeImages(userId, deviceId, sinceIso);
+    await syncSettings(userId, deviceId, pushSinceIso, cursors);
+    await syncLifeImages(userId, deviceId, cursors);
 
-    const finishedAt = nowIso();
-    await saveSettings({ lastSyncedAt: finishedAt });
-    setStatus({ status: 'synced', lastSyncedAt: finishedAt, errorMessage: undefined });
+    await saveSyncBookkeeping({ lastSyncedAt: startedAt, syncCursors: cursors });
+    setStatus({ status: 'synced', lastSyncedAt: nowIso(), errorMessage: undefined });
   } catch (err) {
-    setStatus({ status: 'error', errorMessage: err instanceof Error ? err.message : 'Sync failed' });
+    setStatus({ status: 'error', errorMessage: friendlySyncError(err) });
   } finally {
     syncInFlight = false;
   }

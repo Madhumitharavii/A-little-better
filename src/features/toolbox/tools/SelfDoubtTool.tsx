@@ -41,7 +41,7 @@ export default function SelfDoubtTool({ date, onClose, showToast }: ReflectionTo
       <div className="space-y-3 text-xs">
         <div>
           <label className="block font-semibold text-sand-900 mb-1">1. What am I telling myself?</label>
-          <input
+          <input aria-label="1. What am I telling myself?"
             type="text"
             value={tellingSelf}
             onChange={(e) => setTellingSelf(e.target.value)}
@@ -53,7 +53,7 @@ export default function SelfDoubtTool({ date, onClose, showToast }: ReflectionTo
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block font-semibold text-sand-900 mb-1">2. Evidence supporting it?</label>
-            <textarea
+            <textarea aria-label="2. Evidence supporting it?"
               rows={2}
               value={supports}
               onChange={(e) => setSupports(e.target.value)}
@@ -63,7 +63,7 @@ export default function SelfDoubtTool({ date, onClose, showToast }: ReflectionTo
           </div>
           <div>
             <label className="block font-semibold text-sand-900 mb-1">3. Evidence against it?</label>
-            <textarea
+            <textarea aria-label="3. Evidence against it?"
               rows={2}
               value={against}
               onChange={(e) => setAgainst(e.target.value)}
@@ -75,7 +75,7 @@ export default function SelfDoubtTool({ date, onClose, showToast }: ReflectionTo
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">4. What would I say to a friend in this situation?</label>
-          <input
+          <input aria-label="4. What would I say to a friend in this situation?"
             type="text"
             value={sayToFriend}
             onChange={(e) => setSayToFriend(e.target.value)}

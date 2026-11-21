@@ -45,6 +45,7 @@ export default function WishEditorModal({ existing, listType, onClose, onSave }:
             {listType === 'annualVision' ? 'What do you want to achieve or experience?' : 'What do you want to try?'}
           </label>
           <input
+            aria-label={listType === 'annualVision' ? 'What do you want to achieve or experience?' : 'What do you want to try?'}
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -56,7 +57,7 @@ export default function WishEditorModal({ existing, listType, onClose, onSave }:
         {listType === 'annualVision' && (
           <div>
             <label className="block font-semibold text-sand-900 mb-1">Year</label>
-            <input
+            <input aria-label="Year"
               type="number"
               value={year}
               onChange={(e) => setYear(e.target.value)}
@@ -68,7 +69,7 @@ export default function WishEditorModal({ existing, listType, onClose, onSave }:
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Category (optional)</label>
-          <input
+          <input aria-label="Category (optional)"
             type="text"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -79,7 +80,7 @@ export default function WishEditorModal({ existing, listType, onClose, onSave }:
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">Notes (optional)</label>
-          <textarea
+          <textarea aria-label="Notes (optional)"
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}

@@ -25,7 +25,7 @@ export default function CareForMeSection({
   onOpenFocusTimer,
 }: CareForMeSectionProps) {
   return (
-    <section className="bg-white p-5 sm:p-6 rounded-3xl border border-sand-200 shadow-sm space-y-4">
+    <section id="care-for-me" className="bg-sage-100/50 p-5 sm:p-6 rounded-3xl border border-sage-300/70 shadow-sm space-y-4 scroll-mt-4">
       <div className="flex items-center justify-between border-b border-sand-100 pb-3">
         <h3 className="serif text-xl text-sand-900 font-semibold flex items-center gap-2">
           <span>🛁</span> Care for Me

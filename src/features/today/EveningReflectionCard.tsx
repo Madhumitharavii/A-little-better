@@ -1,40 +1,93 @@
+import { useState } from 'react';
+
 interface EveningReflectionCardProps {
   gratitude: string;
   smallWin: string;
   onChange: (field: 'gratitude' | 'smallWin', value: string) => void;
+  /** Whether "Before I call it a day" (the evening wind-down) is done today. */
+  eveningDone: boolean;
+  onOpenEvening: () => void;
 }
 
-export default function EveningReflectionCard({ gratitude, smallWin, onChange }: EveningReflectionCardProps) {
+/** From this hour on, the reflection opens by itself — it's an end-of-day thing. */
+const EVENING_HOUR = 17;
+
+/**
+ * "This evening": the end-of-day part of Today, kept together — the
+ * "Before I call it a day" wind-down and Today's Reflection. The
+ * reflection's writing fields stay folded during the day (unless
+ * something's already written); tap to open them any time.
+ */
+export default function EveningReflectionCard({
+  gratitude,
+  smallWin,
+  onChange,
+  eveningDone,
+  onOpenEvening,
+}: EveningReflectionCardProps) {
+  const startsOpen = new Date().getHours() >= EVENING_HOUR || !!gratitude || !!smallWin;
+  const [open, setOpen] = useState(startsOpen);
+
   return (
-    <section className="bg-white p-5 sm:p-8 rounded-3xl border border-sand-200 shadow-sm space-y-4">
-      <div className="border-b border-sand-100 pb-3">
-        <h3 className="serif text-xl text-sand-900 font-semibold">Today's Reflection</h3>
-        <p className="text-xs text-sand-800/60">No pressure. Unpack the day with soft notes.</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <section className="bg-gradient-to-br from-slate-100 to-terracotta-100/60 p-5 sm:p-8 rounded-3xl border border-slate-500/20 shadow-sm space-y-4">
+      <div className="border-b border-sand-100 pb-3 flex items-start justify-between gap-3">
         <div>
-          <label className="block text-xs font-medium text-sand-800 mb-1.5">Something I am grateful for today</label>
-          <textarea
-            rows={2}
-            value={gratitude}
-            onChange={(e) => onChange('gratitude', e.target.value)}
-            placeholder="A warm coffee, soft sunlight, a quiet moment..."
-            className="w-full p-3 bg-sand-50/50 border border-sand-200 rounded-2xl text-xs text-sand-900 focus:outline-none focus:border-sand-300 resize-none"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-sand-800 mb-1.5">A small win or quiet progress</label>
-          <textarea
-            rows={2}
-            value={smallWin}
-            onChange={(e) => onChange('smallWin', e.target.value)}
-            placeholder="I started a tough task, drank fresh water, rested well..."
-            className="w-full p-3 bg-sand-50/50 border border-sand-200 rounded-2xl text-xs text-sand-900 focus:outline-none focus:border-sand-300 resize-none"
-          />
+          <h3 className="serif text-xl text-sand-900 font-semibold">🌙 This Evening</h3>
+          <p className="text-xs text-sand-800/60">Wind down, and unpack the day with soft notes. No pressure.</p>
         </div>
       </div>
+
+      <button
+        onClick={onOpenEvening}
+        className={`w-full px-4 py-2.5 rounded-2xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+          eveningDone ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+        }`}
+      >
+        <span>🌙</span> {eveningDone ? 'Evening Done ✓' : 'Before I call it a day'}
+      </button>
+
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          aria-expanded={false}
+          className="w-full px-4 py-3 bg-sand-50 border border-sand-200 rounded-2xl flex items-center justify-between gap-3 text-left"
+        >
+          <span>
+            <span className="block text-sm font-semibold text-sand-900">Today's Reflection</span>
+            <span className="block text-[11px] text-sand-800/60">Opens this evening — or tap to write now.</span>
+          </span>
+          <span aria-hidden="true" className="text-sand-800/50">⌄</span>
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-sand-900">Today's Reflection</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-sand-800 mb-1.5">Something I am grateful for today</label>
+              <textarea
+                aria-label="Something I am grateful for today"
+                rows={2}
+                value={gratitude}
+                onChange={(e) => onChange('gratitude', e.target.value)}
+                placeholder="A warm coffee, soft sunlight, a quiet moment..."
+                className="w-full p-3 bg-sand-50/50 border border-sand-200 rounded-2xl text-xs text-sand-900 focus:outline-none focus:border-sand-300 resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-sand-800 mb-1.5">A small win or quiet progress</label>
+              <textarea
+                aria-label="A small win or quiet progress"
+                rows={2}
+                value={smallWin}
+                onChange={(e) => onChange('smallWin', e.target.value)}
+                placeholder="I started a tough task, drank fresh water, rested well..."
+                className="w-full p-3 bg-sand-50/50 border border-sand-200 rounded-2xl text-xs text-sand-900 focus:outline-none focus:border-sand-300 resize-none"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

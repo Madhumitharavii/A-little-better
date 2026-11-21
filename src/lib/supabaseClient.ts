@@ -3,10 +3,10 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 /**
  * The local Dexie/IndexedDB database remains the app's source of
  * truth and works fully offline with zero Supabase configuration —
- * see src/db/db.ts. This client is a FOUNDATION for a future
- * two-way sync feature that hasn't been built or wired into the UI
- * yet (see src/lib/sync/syncService.ts's doc comment). Nothing in
- * the app currently calls anything in this file.
+ * see src/db/db.ts. This client is used by the optional cross-device
+ * sync layer in src/lib/sync/ (auth in authService.ts, row/image
+ * helpers in syncService.ts, orchestration in syncEngine.ts, which
+ * App.tsx runs automatically).
  *
  * Reads two Vite env vars, both optional:
  *   VITE_SUPABASE_URL

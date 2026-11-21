@@ -69,6 +69,7 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
       </div>
 
       <input
+        aria-label="Search your books"
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

@@ -6,8 +6,10 @@ import type { ToolId } from '@/features/toolbox/types';
 
 import GreetingHeader from './GreetingHeader';
 import TodayFocusBanner from './TodayFocusBanner';
+import ThoughtOfTheDayCard from './ThoughtOfTheDayCard';
+import AdvisorCard from '@/features/advisor/AdvisorCard';
 import CareForMeSection from './CareForMeSection';
-import { SpaceResetCard, MessageResetCard, RelationshipCard } from './StatusCards';
+import AroundMeCard from './StatusCards';
 import EveningReflectionCard from './EveningReflectionCard';
 import SkipReasonModal from './SkipReasonModal';
 
@@ -25,6 +27,7 @@ import MessageResetTool from '@/features/toolbox/tools/MessageResetTool';
 import RelationshipConnectionTool from '@/features/toolbox/tools/RelationshipConnectionTool';
 import EveningModeTool from '@/features/toolbox/tools/EveningModeTool';
 import type { CareItemKey } from '@/db/schema';
+import { recordToolEvent } from '@/db/repositories/toolEventRepository';
 
 interface TodayPageProps {
   showToast: (msg: string) => void;
@@ -49,7 +52,11 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [skipTarget, setSkipTarget] = useState<CareItemKey | null>(null);
 
-  const openTool = (tool: ToolId) => setActiveTool(tool);
+  const openTool = (tool: ToolId) => {
+    // The advisor notices patterns in these two (kept on this device only).
+    if (tool === 'bored' || tool === 'scrolling') void recordToolEvent(tool);
+    setActiveTool(tool);
+  };
   const closeTool = () => setActiveTool(null);
 
   const chime = (type: 'gentle' | 'complete' = 'complete') => playSoftChime(soundEnabled, type);
@@ -59,17 +66,19 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
       <GreetingHeader
         date={date}
         streaks={streaks}
-        eveningDone={!!reflection?.eveningDone}
         onOpenBored={() => openTool('bored')}
         onOpenScrolling={() => openTool('scrolling')}
-        onOpenEvening={() => openTool('evening')}
       />
 
-      <TodayFocusBanner />
+      <ThoughtOfTheDayCard />
 
-      <ToolboxGrid openTool={openTool} />
+      <TodayFocusBanner
+        myselfDone={findEntry('bathed')?.status === 'done' || findEntry('ateFruit')?.status === 'done'}
+        spaceDone={findEntry('spaceReset')?.status === 'done'}
+        peopleDone={findEntry('messageReset')?.status === 'done' || findEntry('relationshipCheck')?.status === 'done'}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 items-start">
         <CareForMeSection
           findEntry={(key) => findEntry(key as CareItemKey)}
           onToggleDone={(key) => {
@@ -84,20 +93,29 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
           onOpenFocusTimer={() => openTool('focusTimer')}
         />
 
-        <div className="space-y-5 sm:space-y-6">
-          <SpaceResetCard isDone={findEntry('spaceReset')?.status === 'done'} onOpen={() => openTool('roomReset')} />
-          <MessageResetCard isDone={findEntry('messageReset')?.status === 'done'} onOpen={() => openTool('messageReset')} />
-          <RelationshipCard
-            isDone={findEntry('relationshipCheck')?.status === 'done'}
-            onOpen={() => openTool('relationshipConnection')}
-          />
-        </div>
+        <AroundMeCard
+          spaceDone={findEntry('spaceReset')?.status === 'done'}
+          messagesDone={findEntry('messageReset')?.status === 'done'}
+          peopleDone={findEntry('relationshipCheck')?.status === 'done'}
+          onOpenSpace={() => openTool('roomReset')}
+          onOpenMessages={() => openTool('messageReset')}
+          onOpenPeople={() => openTool('relationshipConnection')}
+        />
       </div>
+
+      {/* Gentle advice from what's been logged — worked out on-device. */}
+      <AdvisorCard />
+
+      {/* Folded by default — see ToolboxGrid. Sits after the daily care
+          so the everyday checklist comes first. */}
+      <ToolboxGrid openTool={openTool} />
 
       <EveningReflectionCard
         gratitude={reflection?.gratitude ?? ''}
         smallWin={reflection?.smallWin ?? ''}
         onChange={(field, value) => saveReflectionField(field, value)}
+        eveningDone={!!reflection?.eveningDone}
+        onOpenEvening={() => openTool('evening')}
       />
 
       {/* Skip reason */}
@@ -163,6 +181,12 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
       {activeTool === 'relationshipConnection' && (
         <RelationshipConnectionTool
           onClose={closeTool}
+          onConnected={() => {
+            if (findEntry('relationshipCheck')?.status !== 'done') {
+              markDone('relationshipCheck');
+              chime();
+            }
+          }}
           onComplete={() => {
             markDone('relationshipCheck');
             chime();

@@ -161,6 +161,18 @@ export async function importAllData(file: BackupFile): Promise<void> {
     'rw',
     [db.careEntries, db.dailyReflections, db.journalEntries, db.lifeItems, db.lifeImages, db.people, db.periodEntries, db.settings],
     async () => {
+      // Sync bookkeeping belongs to THIS device, not to whichever
+      // device made the backup. Keep this device's own id, and drop
+      // the backup's sync bookmarks so the next sync treats the
+      // restored data as new: pushes all of it, then pulls everything.
+      // (Otherwise restored rows older than the backup's lastSyncedAt
+      // would never be uploaded.)
+      const thisDeviceId = (await db.settings.toCollection().first())?.deviceId;
+      const importedSettings = file.data.settings.map((row) => {
+        const { lastSyncedAt: _lastSyncedAt, syncCursors: _syncCursors, deviceId: _deviceId, ...rest } = row;
+        return thisDeviceId ? { ...rest, deviceId: thisDeviceId } : rest;
+      });
+
       await Promise.all([
         db.careEntries.clear(),
         db.dailyReflections.clear(),
@@ -186,7 +198,7 @@ export async function importAllData(file: BackupFile): Promise<void> {
         db.lifeImages.bulkAdd(decodedImages),
         db.people.bulkAdd(file.data.people),
         db.periodEntries.bulkAdd(periodEntries),
-        db.settings.bulkAdd(file.data.settings),
+        db.settings.bulkAdd(importedSettings),
       ]);
     },
   );

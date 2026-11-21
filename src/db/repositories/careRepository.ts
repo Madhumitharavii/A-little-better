@@ -1,3 +1,4 @@
+import { recordTombstone } from './syncTombstoneRepository';
 import { db } from '../db';
 import { generateId, nowIso } from '../id';
 import type { CareEntry, CareItemKey, CareStatus } from '../schema';
@@ -109,5 +110,8 @@ export async function clearCareEntry(date: string, itemKey: CareItemKey): Promis
     .first();
   if (existing) {
     await db.careEntries.delete(existing.id);
+    // Lets the deletion reach other devices on the next sync instead
+    // of the old entry coming back from Supabase.
+    await recordTombstone('care_entries', existing.id);
   }
 }

@@ -1,5 +1,6 @@
 import { useStats } from './useStats';
 import { useLifeCounts } from '@/features/life/useLifeItems';
+import { useStreaks } from '@/features/today/useStreaks';
 
 const TILE_STYLES = [
   'bg-sage-100 border-sage-300 text-sage-700',
@@ -16,6 +17,8 @@ interface StatTile {
 export default function StatsSection() {
   const stats = useStats();
   const lifeCounts = useLifeCounts();
+  // Current streaks (these used to sit on Today's greeting; all the numbers now live here).
+  const streaks = useStreaks();
 
   const tiles: StatTile[] = [
     { icon: '📖', text: `Read on ${stats.daysReadThisMonth} day${stats.daysReadThisMonth === 1 ? '' : 's'} this month` },
@@ -59,6 +62,15 @@ export default function StatsSection() {
           <span className="text-base">🌟</span>
           <span>
             Right now, you're {stats.currentShowingUpStreak} day{stats.currentShowingUpStreak === 1 ? '' : 's'} into showing up.
+          </span>
+        </div>
+      )}
+
+      {streaks.readingStreak > 0 && (
+        <div className="mt-3 p-3.5 bg-gradient-to-r from-sage-100 to-sand-100 border border-sage-300 rounded-2xl text-xs font-semibold text-sand-900 flex items-center gap-2">
+          <span className="text-base">🔥</span>
+          <span>
+            You've read {streaks.readingStreak} day{streaks.readingStreak === 1 ? '' : 's'} in a row.
           </span>
         </div>
       )}
