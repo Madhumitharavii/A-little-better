@@ -4,22 +4,6 @@
 
 A private, local-first life-care app — daily care, study, reflection, people, and the things I read, watch, make and live — with gentle, on-device advice drawn from my own logs. Installable on phone and desktop as a PWA, works fully offline, and optionally syncs across my own devices.
 
-<p align="center">
-  <img src="docs/screenshots/today.png" width="220" alt="Today: greeting, Thought of the Day and the day's gentle priorities" />
-  <img src="docs/screenshots/noticed.png" width="220" alt="Noticed for You: on-device advice with a 'Because' line" />
-  <img src="docs/screenshots/learning.png" width="220" alt="Learning: study timer, subjects and weekly goal progress" />
-</p>
-<p align="center">
-  <img src="docs/screenshots/subject.png" width="220" alt="A subject: totals, weekly goal and topic progress" />
-  <img src="docs/screenshots/life.png" width="220" alt="Life: books, movies, series, artwork, experiences and plans" />
-  <img src="docs/screenshots/journal.png" width="220" alt="Journal entries with mood and tags" />
-</p>
-<p align="center">
-  <img src="docs/screenshots/me.png" width="220" alt="Me: My People, reminders and cycle tracking" />
-  <img src="docs/screenshots/today-dark.png" width="220" alt="Today in dark mode" />
-</p>
-<p align="center"><sub>Screenshots use made-up sample data.</sub></p>
-
 ## About the Project
 
 A Little Better is a personal project built for my own daily life. The application is designed around my routines, preferences, reflections, and the way I want to interact with a personal care system.
