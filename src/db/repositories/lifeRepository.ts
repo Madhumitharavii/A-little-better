@@ -1,4 +1,4 @@
-import { isWatchlistMovie } from '@/db/lifeDates';
+import { isWishlistItem } from '@/db/lifeDates';
 import { db } from '../db';
 import { generateId, nowIso } from '../id';
 import type { LifeItem, LifeItemType, NewLifeItemInput, LifeItemPatch, BookItem, MovieItem } from '../schema';
@@ -184,7 +184,7 @@ export async function searchLifeItems(query: string): Promise<LifeItem[]> {
 export async function getRecentlyAdded(limit = 6): Promise<LifeItem[]> {
   const all = await db.lifeItems.toArray();
   return all
-    .filter((item) => isLifeItem(item) && !isWatchlistMovie(item))
+    .filter((item) => isLifeItem(item) && !isWishlistItem(item))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, limit);
 }
@@ -202,7 +202,7 @@ export async function getLifeCounts(): Promise<LifeCounts> {
   const all = await db.lifeItems.toArray();
   const counts: LifeCounts = { book: 0, movie: 0, series: 0, artwork: 0, experience: 0, wish: 0 };
   for (const item of all) {
-    if (!isLifeItem(item) || isWatchlistMovie(item)) continue;
+    if (!isLifeItem(item) || isWishlistItem(item)) continue;
     counts[item.type]++;
   }
   return counts;

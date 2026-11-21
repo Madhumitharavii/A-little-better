@@ -13,16 +13,13 @@ interface BooksPageProps {
   initialOpenItem?: BookItem;
 }
 
-type FilterTab = 'all' | 'wantTo' | 'inProgress' | 'finished' | 'didNotFinish' | 'favorites';
+type FilterTab = 'all' | 'wantTo' | 'inProgress' | 'finished' | 'didNotFinish' | 'favorites' | 'shelves';
 
-const TABS: { id: FilterTab; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'wantTo', label: 'Want to Read' },
-  { id: 'inProgress', label: 'Reading' },
-  { id: 'finished', label: 'Finished' },
-  { id: 'didNotFinish', label: 'Did Not Finish' },
-  { id: 'favorites', label: 'Favorites' },
-];
+const PAGE = 60;
+/** Most recently finished first; then by title (numbers in order). */
+const byLatest = (a: BookItem, b: BookItem) =>
+  (b.dateFinished ?? b.dateStarted ?? '').localeCompare(a.dateFinished ?? a.dateStarted ?? '') ||
+  a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
 
 export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksPageProps) {
   const books = useLifeItemsOfType('book') as BookItem[];
@@ -31,19 +28,43 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
   const [editing, setEditing] = useState<'closed' | 'new' | BookItem>('closed');
   const [detail, setDetail] = useState<BookItem | null>(initialOpenItem ?? null);
   const [importing, setImporting] = useState(false);
+  const [shelf, setShelf] = useState<string | null>(null);
+  const [visible, setVisible] = useState(PAGE);
+
+  useEffect(() => setVisible(PAGE), [tab, query, shelf]);
+
+  const shelfNames = useMemo(() => {
+    const names = new Map<string, number>();
+    for (const b of books) for (const sh of b.shelves ?? []) names.set(sh, (names.get(sh) ?? 0) + 1);
+    return [...names.entries()].sort((a, b) => b[1] - a[1]);
+  }, [books]);
+  const countOf = (pred: (b: BookItem) => boolean) => books.filter(pred).length;
+  const tabs: { id: FilterTab; label: string; count?: number }[] = [
+    // "All" is what's been read or started — want-to-read lives in its own tab.
+    { id: 'all', label: 'All', count: countOf((b) => b.status !== 'wantTo') },
+    { id: 'inProgress', label: 'Reading', count: countOf((b) => b.status === 'inProgress') },
+    { id: 'finished', label: 'Finished', count: countOf((b) => b.status === 'finished') },
+    { id: 'favorites', label: 'Favorites', count: countOf((b) => !!b.favorite) },
+    { id: 'wantTo', label: 'Want to Read', count: countOf((b) => b.status === 'wantTo') },
+    { id: 'didNotFinish', label: 'Did Not Finish', count: countOf((b) => b.status === 'didNotFinish') },
+    ...(shelfNames.length ? [{ id: 'shelves' as const, label: 'Shelves', count: shelfNames.length }] : []),
+  ];
 
   useEffect(() => {
     if (initialOpenItem) setDetail(initialOpenItem);
   }, [initialOpenItem]);
 
   const filtered = useMemo(() => {
-    let list = books;
-    if (tab === 'favorites') list = list.filter((b) => b.favorite);
-    else if (tab !== 'all') list = list.filter((b) => b.status === tab);
+    let list = [...books].sort(byLatest);
+    if (tab === 'all') list = list.filter((b) => b.status !== 'wantTo');
+    else if (tab === 'favorites') list = list.filter((b) => b.favorite);
+    else if (tab === 'shelves') list = shelf ? list.filter((b) => b.shelves?.includes(shelf)) : [];
+    else if (tab === 'wantTo') list = list.filter((b) => b.status === 'wantTo').sort((a, b) => (b.dateAdded ?? '').localeCompare(a.dateAdded ?? ''));
+    else list = list.filter((b) => b.status === tab);
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((b) => b.title.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q));
     return list;
-  }, [books, tab, query]);
+  }, [books, tab, query, shelf]);
 
   return (
     <div className="space-y-5">
@@ -78,7 +99,7 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
       />
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -87,20 +108,47 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
             }`}
           >
             {t.label}
+            {t.count != null && t.count > 0 && <span className="ml-1 opacity-70">{t.count.toLocaleString()}</span>}
           </button>
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {tab === 'shelves' && (
+        <div className="flex flex-wrap gap-2">
+          {shelfNames.map(([name, count]) => (
+            <button
+              key={name}
+              onClick={() => setShelf(shelf === name ? null : name)}
+              className={`px-3 py-2 rounded-2xl text-xs font-medium border transition-all ${
+                shelf === name ? 'bg-sage-500 text-white border-sage-500' : 'bg-sage-100 text-sage-700 border-sage-300/40'
+              }`}
+            >
+              🗂️ {name} <span className="opacity-70">{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'shelves' && !shelf ? (
+        <p className="text-xs text-sand-800/60 px-1">Choose a shelf to see its books.</p>
+      ) : filtered.length === 0 ? (
         <div className="bg-white p-8 rounded-3xl border border-sand-200 text-center space-y-2">
           <span className="text-3xl block">📖</span>
           <p className="text-sm text-sand-800/70">Nothing here yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {filtered.map((book) => (
+          {filtered.slice(0, visible).map((book) => (
             <BookCard key={book.id} book={book} onClick={() => setDetail(book)} />
           ))}
+          {filtered.length > visible && (
+            <button
+              onClick={() => setVisible((v) => v + PAGE * 2)}
+              className="sm:col-span-2 py-3 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl"
+            >
+              Show more ({(filtered.length - visible).toLocaleString()} left)
+            </button>
+          )}
         </div>
       )}
 
@@ -154,7 +202,7 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
           onClose={() => setImporting(false)}
           onImported={(count) => {
             setImporting(false);
-            showToast(count > 0 ? `Imported ${count} book${count === 1 ? '' : 's'} from Goodreads 📚` : 'Nothing new to import');
+            showToast(count > 0 ? `Imported ${count.toLocaleString()} book${count === 1 ? '' : 's'} from Goodreads 📚` : 'Everything was already up to date');
           }}
         />
       )}

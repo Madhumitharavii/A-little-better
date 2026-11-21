@@ -53,6 +53,15 @@ export default function BookDetailModal({ book, onClose, onEdit, onToggleFavorit
           )}
           {!!book.rating && <StarRating value={book.rating} size="sm" />}
           {book.favorite && <p className="text-terracotta-600 text-xs">♥ Favorite</p>}
+          {!!book.shelves?.length && (
+            <div className="flex flex-wrap gap-1">
+              {book.shelves.map((sh) => (
+                <span key={sh} className="text-[10px] bg-sage-100 text-sage-700 px-2 py-0.5 rounded-full">
+                  🗂️ {sh}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

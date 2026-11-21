@@ -131,6 +131,8 @@ export interface BookItem extends LifeItemBase {
   quote?: string;
   /** Earlier readings, oldest first — see BookReadingEntry. */
   previousReadings?: BookReadingEntry[];
+  /** Shelves this book is on (e.g. custom Goodreads shelves). */
+  shelves?: string[];
   /** Where the record came from — 'goodreads' when added by the Goodreads CSV import (books/goodreadsImport.ts). */
   source?: 'manual' | 'goodreads';
 }

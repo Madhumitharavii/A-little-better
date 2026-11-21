@@ -1,6 +1,7 @@
 import type { LifeItemPatch, MovieItem, MovieListEntry, MovieWatchEntry } from '@/db/schema';
 import { generateId } from '@/db/id';
 import { parseCsv } from '@/shared/utils/csv';
+import { cleanReview } from '@/shared/utils/html';
 
 /**
  * Letterboxd → A Little Better: a ONE-WAY import of the folder you get
@@ -91,22 +92,8 @@ const num = (s?: string) => {
   return v ? Number(v) : undefined;
 };
 
-/** Letterboxd reviews are exported as light HTML — turn them into plain text. */
-export function cleanReview(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>\s*<p>/gi, '\n\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
+/** Letterboxd reviews are exported as light HTML — see cleanReview. */
+export { cleanReview };
 
 /** Rows of a simple export CSV as objects keyed by lower-cased header. */
 function records(text: string): Record<string, string>[] {

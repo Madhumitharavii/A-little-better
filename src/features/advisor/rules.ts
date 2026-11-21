@@ -566,9 +566,7 @@ const annualVision: Rule = (d) => {
 const balancedWeek: Rule = (d) => {
   const kinds = new Set<string>();
   for (const i of d.life) {
-    const date = i.type === 'experience' ? i.date : i.type === 'artwork' ? i.dateCreated : i.type === 'movie' ? i.dateWatched : i.type === 'book' ? i.dateFinished : undefined;
-    const when = i.type === 'movie' ? lifeItemActivityDates(i)[0] : date ?? keyOf(i.createdAt);
-    if (when && within(when, d.today, 7) && i.type !== 'wish') kinds.add(i.type);
+    if (i.type !== 'wish' && lifeItemActivityDates(i).some((date) => within(date, d.today, 7))) kinds.add(i.type);
   }
   if (careMinutes(d.care, 'focus', d.today, 7) >= 60) kinds.add('focus');
   if (d.journal.some((j) => within(j.date, d.today, 7))) kinds.add('journal');
