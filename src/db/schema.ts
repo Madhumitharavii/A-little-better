@@ -85,7 +85,8 @@ export type LifeItemType = 'book' | 'movie' | 'series' | 'artwork' | 'experience
 export type BookStatus = 'wantTo' | 'inProgress' | 'finished' | 'didNotFinish';
 
 /** A movie is assumed watched unless marked otherwise — no separate "watched" status needed. */
-export type MovieStatus = 'watched' | 'didNotFinish';
+/** 'watchlist' = want to watch (not yet seen) — kept out of everything that counts what was watched. */
+export type MovieStatus = 'watched' | 'didNotFinish' | 'watchlist';
 
 export type SeriesStatus = 'wantTo' | 'watching' | 'finished' | 'didNotFinish';
 
@@ -147,6 +148,11 @@ export interface MovieWatchEntry {
   source?: 'manual' | 'letterboxd';
 }
 
+export interface MovieListEntry {
+  name: string;
+  position?: number;
+}
+
 export interface MovieItem extends LifeItemBase {
   type: 'movie';
   year?: number;
@@ -164,6 +170,8 @@ export interface MovieItem extends LifeItemBase {
   tmdbId?: string;
   /** Earlier watches, oldest first — see MovieWatchEntry. */
   previousWatches?: MovieWatchEntry[];
+  /** Lists this film is on (e.g. from Letterboxd), with its position in each. */
+  lists?: MovieListEntry[];
   /** Set to 'letterboxd' for rows brought in via the diary CSV importer. */
   source?: 'manual' | 'letterboxd';
 }

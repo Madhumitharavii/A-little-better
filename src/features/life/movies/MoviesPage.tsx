@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLifeItemsOfType } from '../useLifeItems';
 import { createLifeItem, updateLifeItem, toggleFavorite, deleteLifeItem, logMovieRewatch } from '@/db/repositories/lifeRepository';
 import type { MovieItem } from '@/db/schema';
+import { getLocalDateKey } from '@/db/dateUtils';
 import MovieCard from './MovieCard';
 import MovieEditorModal from './MovieEditorModal';
 import MovieDetailModal from './MovieDetailModal';
@@ -13,14 +14,14 @@ interface MoviesPageProps {
   initialOpenItem?: MovieItem;
 }
 
-type FilterTab = 'all' | 'recent' | 'favorites' | 'rewatches';
+type FilterTab = 'all' | 'recent' | 'favorites' | 'rewatches' | 'reviews' | 'watchlist' | 'lists';
 
-const TABS: { id: FilterTab; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'recent', label: 'Recently Watched' },
-  { id: 'favorites', label: 'Favorites' },
-  { id: 'rewatches', label: 'Rewatches' },
-];
+const PAGE = 60;
+
+const hasReview = (m: MovieItem) => !!m.review || !!m.previousWatches?.some((w) => w.review);
+/** Newest watch first; films with no watch date after, by title. */
+const byLatest = (a: MovieItem, b: MovieItem) =>
+  (b.dateWatched ?? '').localeCompare(a.dateWatched ?? '') || a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" });
 
 export default function MoviesPage({ showToast, onBack, initialOpenItem }: MoviesPageProps) {
   const movies = useLifeItemsOfType('movie') as MovieItem[];
@@ -29,20 +30,53 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
   const [editing, setEditing] = useState<'closed' | 'new' | MovieItem>('closed');
   const [detail, setDetail] = useState<MovieItem | null>(initialOpenItem ?? null);
   const [importing, setImporting] = useState(false);
+  const [list, setList] = useState<string | null>(null);
+  const [visible, setVisible] = useState(PAGE);
+
+  useEffect(() => setVisible(PAGE), [tab, query, list]);
+
+  const watched = useMemo(() => movies.filter((m) => m.status !== 'watchlist'), [movies]);
+  const watchlist = useMemo(() => movies.filter((m) => m.status === 'watchlist'), [movies]);
+  const listNames = useMemo(() => {
+    const names = new Map<string, number>();
+    for (const m of movies) for (const l of m.lists ?? []) names.set(l.name, (names.get(l.name) ?? 0) + 1);
+    return [...names.entries()];
+  }, [movies]);
+
+  const tabs: { id: FilterTab; label: string; count?: number }[] = [
+    { id: 'all', label: 'All', count: watched.length },
+    { id: 'recent', label: 'Recently Watched' },
+    { id: 'favorites', label: 'Favorites', count: watched.filter((m) => m.favorite).length },
+    { id: 'rewatches', label: 'Rewatches', count: watched.filter((m) => m.rewatch).length },
+    { id: 'reviews', label: 'Reviews', count: watched.filter(hasReview).length },
+    { id: 'watchlist', label: 'Watchlist', count: watchlist.length },
+    ...(listNames.length ? [{ id: 'lists' as const, label: 'Lists', count: listNames.length }] : []),
+  ];
 
   useEffect(() => {
     if (initialOpenItem) setDetail(initialOpenItem);
   }, [initialOpenItem]);
 
   const filtered = useMemo(() => {
-    let list = movies;
-    if (tab === 'favorites') list = list.filter((m) => m.favorite);
-    else if (tab === 'rewatches') list = list.filter((m) => m.rewatch);
-    else if (tab === 'recent') list = [...list].sort((a, b) => (b.dateWatched ?? '').localeCompare(a.dateWatched ?? ''));
+    let out: MovieItem[];
+    if (tab === 'watchlist') out = [...watchlist].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" }));
+    else if (tab === 'lists') {
+      if (!list) out = [];
+      else {
+        const pos = (m: MovieItem) => m.lists?.find((l) => l.name === list)?.position ?? Infinity;
+        out = movies.filter((m) => m.lists?.some((l) => l.name === list)).sort((a, b) => pos(a) - pos(b));
+      }
+    } else {
+      out = [...watched].sort(byLatest);
+      if (tab === 'favorites') out = out.filter((m) => m.favorite);
+      else if (tab === 'rewatches') out = out.filter((m) => m.rewatch);
+      else if (tab === 'reviews') out = out.filter(hasReview);
+      else if (tab === 'recent') out = out.filter((m) => m.dateWatched);
+    }
     const q = query.trim().toLowerCase();
-    if (q) list = list.filter((m) => m.title.toLowerCase().includes(q));
-    return list;
-  }, [movies, tab, query]);
+    if (q) out = out.filter((m) => m.title.toLowerCase().includes(q));
+    return out;
+  }, [movies, watched, watchlist, tab, query, list]);
 
   return (
     <div className="space-y-5">
@@ -77,7 +111,7 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
       />
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -86,20 +120,47 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
             }`}
           >
             {t.label}
+            {t.count != null && t.count > 0 && <span className="ml-1 opacity-70">{t.count.toLocaleString()}</span>}
           </button>
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {tab === 'lists' && (
+        <div className="flex flex-wrap gap-2">
+          {listNames.map(([name, count]) => (
+            <button
+              key={name}
+              onClick={() => setList(list === name ? null : name)}
+              className={`px-3 py-2 rounded-2xl text-xs font-medium border transition-all ${
+                list === name ? 'bg-slate-500 text-white border-slate-500' : 'bg-slate-100 text-slate-800 border-slate-200'
+              }`}
+            >
+              📋 {name} <span className="opacity-70">{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'lists' && !list ? (
+        <p className="text-xs text-sand-800/60 px-1">Choose a list to see its films in order.</p>
+      ) : filtered.length === 0 ? (
         <div className="bg-white p-8 rounded-3xl border border-sand-200 text-center space-y-2">
           <span className="text-3xl block">🎬</span>
           <p className="text-sm text-sand-800/70">Nothing here yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {filtered.map((movie) => (
+          {filtered.slice(0, visible).map((movie) => (
             <MovieCard key={movie.id} movie={movie} onClick={() => setDetail(movie)} />
           ))}
+          {filtered.length > visible && (
+            <button
+              onClick={() => setVisible((v) => v + PAGE * 2)}
+              className="sm:col-span-2 py-3 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl"
+            >
+              Show more ({(filtered.length - visible).toLocaleString()} left)
+            </button>
+          )}
         </div>
       )}
 
@@ -137,6 +198,11 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
             showToast('Movie removed');
             setDetail(null);
           }}
+          onMarkWatched={async () => {
+            const updated = await updateLifeItem(detail.id, { type: 'movie', status: 'watched', dateWatched: getLocalDateKey() });
+            if (updated?.type === 'movie') setDetail(updated);
+            showToast('Moved from your watchlist to watched 🎬');
+          }}
           onLogRewatch={async () => {
             const updated = await logMovieRewatch(detail.id);
             if (updated) {
@@ -153,7 +219,7 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
           onClose={() => setImporting(false)}
           onImported={(count) => {
             setImporting(false);
-            showToast(`Imported ${count} movie${count === 1 ? '' : 's'} from Letterboxd 🎞️`);
+            showToast(count > 0 ? `Imported ${count.toLocaleString()} movie${count === 1 ? '' : 's'} from Letterboxd 🎞️` : 'Everything was already up to date');
           }}
         />
       )}

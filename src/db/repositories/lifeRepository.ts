@@ -1,3 +1,4 @@
+import { isWatchlistMovie } from '@/db/lifeDates';
 import { db } from '../db';
 import { generateId, nowIso } from '../id';
 import type { LifeItem, LifeItemType, NewLifeItemInput, LifeItemPatch, BookItem, MovieItem } from '../schema';
@@ -49,6 +50,14 @@ export async function createLifeItem(input: NewLifeItemInput): Promise<LifeItem>
   const item = { ...input, id: generateId(), createdAt: timestamp, updatedAt: timestamp } as LifeItem;
   await db.lifeItems.add(item);
   return item;
+}
+
+/** Adds many items in one transaction (used by imports — thousands of rows in a second or two). */
+export async function bulkCreateLifeItems(inputs: NewLifeItemInput[]): Promise<number> {
+  const timestamp = nowIso();
+  const items = inputs.map((input) => ({ ...input, id: generateId(), createdAt: timestamp, updatedAt: timestamp }) as LifeItem);
+  await db.lifeItems.bulkAdd(items);
+  return items.length;
 }
 
 export async function updateLifeItem(id: string, patch: LifeItemPatch): Promise<LifeItem | undefined> {
@@ -175,7 +184,7 @@ export async function searchLifeItems(query: string): Promise<LifeItem[]> {
 export async function getRecentlyAdded(limit = 6): Promise<LifeItem[]> {
   const all = await db.lifeItems.toArray();
   return all
-    .filter(isLifeItem)
+    .filter((item) => isLifeItem(item) && !isWatchlistMovie(item))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, limit);
 }
@@ -193,7 +202,7 @@ export async function getLifeCounts(): Promise<LifeCounts> {
   const all = await db.lifeItems.toArray();
   const counts: LifeCounts = { book: 0, movie: 0, series: 0, artwork: 0, experience: 0, wish: 0 };
   for (const item of all) {
-    if (!isLifeItem(item)) continue;
+    if (!isLifeItem(item) || isWatchlistMovie(item)) continue;
     counts[item.type]++;
   }
   return counts;

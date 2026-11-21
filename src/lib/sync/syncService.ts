@@ -56,10 +56,17 @@ export async function pushRow<T extends Record<string, unknown>>(table: SyncTabl
 export async function pushRows<T extends Record<string, unknown>>(table: SyncTableName, rows: T[]): Promise<void> {
   if (rows.length === 0) return;
   const client = requireSupabase();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (client.from(table) as any).upsert(rows, { onConflict: conflictTarget(table) });
-  if (error) throw error;
+  // In chunks, so a big import (thousands of films) doesn't become one huge request.
+  for (let i = 0; i < rows.length; i += PUSH_CHUNK) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (client.from(table) as any).upsert(rows.slice(i, i + PUSH_CHUNK), { onConflict: conflictTarget(table) });
+    if (error) throw error;
+  }
 }
+
+const PUSH_CHUNK = 500;
+/** Supabase returns at most 1000 rows per request by default — larger pulls are paged. */
+export const PULL_PAGE = 1000;
 
 /**
  * Pulls every row for the current user changed since `sinceIso`
@@ -69,13 +76,19 @@ export async function pushRows<T extends Record<string, unknown>>(table: SyncTab
  */
 export async function pullRowsSince<T>(table: SyncTableName, userId: string, sinceIso?: string): Promise<T[]> {
   const client = requireSupabase();
-  let query = client.from(table).select('*').eq('user_id', userId);
-  if (sinceIso) {
-    query = query.gt('synced_at', sinceIso);
+  const all: T[] = [];
+  for (let from = 0; ; from += PULL_PAGE) {
+    let query = client.from(table).select('*').eq('user_id', userId);
+    if (sinceIso) {
+      query = query.gt('synced_at', sinceIso);
+    }
+    // A stable order so pages never overlap or skip rows.
+    const { data, error } = await query.order('synced_at', { ascending: true }).order('id', { ascending: true }).range(from, from + PULL_PAGE - 1);
+    if (error) throw error;
+    all.push(...((data ?? []) as T[]));
+    if (!data || data.length < PULL_PAGE) break;
   }
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []) as T[];
+  return all;
 }
 
 /**

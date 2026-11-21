@@ -1,3 +1,4 @@
+import { lifeItemActivityDates } from '@/db/lifeDates';
 import type {
   CareEntry,
   DailyReflection,
@@ -131,7 +132,7 @@ type Rule = (d: AdvisorData) => Insight | null;
 
 /** Lots of watching, little focused work → suggest some study / focus time. */
 const screenBalance: Rule = (d) => {
-  const movies = d.life.filter((i): i is MovieItem => i.type === 'movie' && within(i.dateWatched ?? keyOf(i.createdAt), d.today, 7));
+  const movies = d.life.filter((i): i is MovieItem => i.type === 'movie' && lifeItemActivityDates(i).some((date) => within(date, d.today, 7)));
   const shows = episodesWatched(d.life.filter((i): i is SeriesItem => i.type === 'series'), d.today, 7);
   const episodeCount = shows.reduce((s, x) => s + x.count, 0);
   const watched = movies.length + episodeCount;
@@ -566,7 +567,8 @@ const balancedWeek: Rule = (d) => {
   const kinds = new Set<string>();
   for (const i of d.life) {
     const date = i.type === 'experience' ? i.date : i.type === 'artwork' ? i.dateCreated : i.type === 'movie' ? i.dateWatched : i.type === 'book' ? i.dateFinished : undefined;
-    if (within(date ?? keyOf(i.createdAt), d.today, 7) && i.type !== 'wish') kinds.add(i.type);
+    const when = i.type === 'movie' ? lifeItemActivityDates(i)[0] : date ?? keyOf(i.createdAt);
+    if (when && within(when, d.today, 7) && i.type !== 'wish') kinds.add(i.type);
   }
   if (careMinutes(d.care, 'focus', d.today, 7) >= 60) kinds.add('focus');
   if (d.journal.some((j) => within(j.date, d.today, 7))) kinds.add('journal');

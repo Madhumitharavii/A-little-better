@@ -1,15 +1,8 @@
 import { useRef, useState } from 'react';
 import Modal, { ModalHeader } from '@/shared/components/Modal';
 import type { MovieItem } from '@/db/schema';
-import { createLifeItem, updateLifeItem } from '@/db/repositories/lifeRepository';
-import {
-  parseLetterboxdDiaryCsv,
-  groupRowsByFilm,
-  findExistingDuplicate,
-  groupToNewMovieInput,
-  mergeGroupIntoExisting,
-  type GroupedLetterboxdFilm,
-} from './letterboxdImport';
+import { bulkCreateLifeItems, updateLifeItem } from '@/db/repositories/lifeRepository';
+import { classifyExportFile, parseLetterboxdExport, planImport, type ExportFile, type ImportPlan } from './letterboxdImport';
 
 interface LetterboxdImportModalProps {
   existingMovies: MovieItem[];
@@ -17,100 +10,112 @@ interface LetterboxdImportModalProps {
   onImported: (count: number) => void;
 }
 
-interface ReviewRow {
-  group: GroupedLetterboxdFilm;
-  duplicate: MovieItem | undefined;
-  selected: boolean;
-}
+/** The folder picker attribute isn't in React's types. */
+const folderPickerProps = { webkitdirectory: '', directory: '' } as Record<string, string>;
 
 export default function LetterboxdImportModal({ existingMovies, onClose, onImported }: LetterboxdImportModalProps) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const [reviewRows, setReviewRows] = useState<ReviewRow[] | null>(null);
+  const folderRef = useRef<HTMLInputElement | null>(null);
+  const filesRef = useRef<HTMLInputElement | null>(null);
+  const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  const handleFile = (file: File) => {
+  const handleFiles = async (fileList: FileList | null) => {
     setError(null);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const rows = parseLetterboxdDiaryCsv(text);
-        if (rows.length === 0) {
-          setError('No diary entries were found in this file.');
-          return;
-        }
-        const groups = groupRowsByFilm(rows);
-        setReviewRows(
-          groups.map((group) => {
-            const duplicate = findExistingDuplicate(group, existingMovies);
-            return { group, duplicate, selected: true };
-          }),
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'This file could not be read.');
+    const picked = Array.from(fileList ?? []).filter((f) => {
+      const path = f.webkitRelativePath || f.name;
+      return classifyExportFile(path) !== null;
+    });
+    if (picked.length === 0) {
+      setError("No Letterboxd files found. Choose the unzipped export folder (the one with diary.csv, watched.csv, watchlist.csv…).");
+      return;
+    }
+    setBusy('Reading your export…');
+    try {
+      const files: ExportFile[] = await Promise.all(picked.map(async (f) => ({ path: f.webkitRelativePath || f.name, text: await f.text() })));
+      const exp = parseLetterboxdExport(files);
+      if (exp.films.length === 0) {
+        setError('No films were found in these files.');
+        return;
       }
-    };
-    reader.readAsText(file);
-  };
-
-  const toggleRow = (index: number) => {
-    setReviewRows((prev) => prev?.map((r, i) => (i === index ? { ...r, selected: !r.selected } : r)) ?? null);
+      setPlan(planImport(exp, existingMovies));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'These files could not be read.');
+    } finally {
+      setBusy(null);
+    }
   };
 
   const confirmImport = async () => {
-    if (!reviewRows) return;
-    setImporting(true);
-    let count = 0;
-    for (const { group, duplicate, selected } of reviewRows) {
-      if (!selected) continue;
-      if (duplicate) {
-        const patch = mergeGroupIntoExisting(duplicate, group);
-        if (patch) {
-          await updateLifeItem(duplicate.id, patch);
-          count++;
-        }
-      } else {
-        await createLifeItem({ type: 'movie', ...groupToNewMovieInput(group) });
-        count++;
-      }
+    if (!plan) return;
+    setBusy('Importing…');
+    try {
+      const created = plan.creates.length ? await bulkCreateLifeItems(plan.creates) : 0;
+      for (const { id, patch } of plan.updates) await updateLifeItem(id, patch);
+      onImported(created + plan.updates.length);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The import could not be completed.');
+      setBusy(null);
     }
-    setImporting(false);
-    onImported(count);
   };
 
-  const selectedCount = reviewRows?.filter((r) => r.selected).length ?? 0;
+  const s = plan?.summary;
+  const n = (x: number) => x.toLocaleString();
 
   return (
     <Modal onClose={onClose}>
       <ModalHeader icon="🎞️" title="Import from Letterboxd" onClose={onClose} />
 
-      {!reviewRows ? (
+      {!plan ? (
         <div className="space-y-4 text-xs">
-          <p className="text-sand-800/80 leading-relaxed">
-            On letterboxd.com, go to <strong>Settings → Data → Export Your Data</strong> to download a ZIP file.
-            Unzip it and choose the <strong>diary.csv</strong> file from inside.
-          </p>
-          <p className="text-sand-800/60">
-            This is a one-way import — nothing is sent anywhere, and your Letterboxd account is never contacted.
-            You can re-run this any time; rewatches and repeat imports are merged, not duplicated.
+          <ol className="text-sand-800/80 leading-relaxed list-decimal pl-4 space-y-1">
+            <li>
+              On letterboxd.com: <strong>Settings → Data → Export Your Data</strong>.
+            </li>
+            <li>Unzip the downloaded file (double-click it).</li>
+            <li>
+              Choose the <strong>whole unzipped folder</strong> below.
+            </li>
+          </ol>
+          <p className="text-sand-800/60 leading-relaxed">
+            Brings in your diary, every film you've marked watched, reviews, ratings, liked films (as ♥ favorites), your
+            watchlist and your lists. Nothing is sent anywhere and Letterboxd is never contacted. Safe to re-run — it merges,
+            never duplicates.
           </p>
 
           <button
-            onClick={() => inputRef.current?.click()}
-            className="w-full py-3 bg-terracotta-400 hover:bg-terracotta-600 text-white font-semibold rounded-2xl"
+            onClick={() => folderRef.current?.click()}
+            disabled={!!busy}
+            className="w-full py-3 bg-terracotta-400 hover:bg-terracotta-600 disabled:opacity-50 text-white font-semibold rounded-2xl"
           >
-            Choose diary.csv
+            {busy ?? 'Choose the export folder'}
+          </button>
+          <button
+            onClick={() => filesRef.current?.click()}
+            disabled={!!busy}
+            className="w-full py-2 text-sand-800/70 hover:text-sand-900 underline underline-offset-2"
+          >
+            Or choose individual files (e.g. just diary.csv)
           </button>
           <input
-            ref={inputRef}
+            ref={folderRef}
             type="file"
+            className="hidden"
+            {...folderPickerProps}
+            onChange={(e) => {
+              void handleFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={filesRef}
+            type="file"
+            multiple
             accept=".csv,text/csv"
             className="hidden"
             onChange={(e) => {
-              const file = e.target.files?.[0];
+              void handleFiles(e.target.files);
               e.target.value = '';
-              if (file) handleFile(file);
             }}
           />
 
@@ -118,38 +123,42 @@ export default function LetterboxdImportModal({ existingMovies, onClose, onImpor
         </div>
       ) : (
         <div className="space-y-4 text-xs">
-          <p className="text-sand-800/80">
-            Found {reviewRows.length} films ({reviewRows.reduce((s, r) => s + r.group.rows.length, 0)} watches
-            total). Films already in your library will have new watches merged in rather than duplicated.
+          <p className="text-sand-800/80">Here's what was found:</p>
+          <ul className="grid grid-cols-2 gap-2">
+            {[
+              ['🎬', `${n(s!.watched)} films watched`, `${n(s!.dated)} with dates · ${n(s!.watches)} logged watches`],
+              ['✍️', `${n(s!.reviews)} reviews`, 'attached to the watch they belong to'],
+              ['♥', `${n(s!.favorites)} liked films`, 'marked as favorites'],
+              ['🍿', `${n(s!.watchlist)} on your watchlist`, 'kept separate from what you watched'],
+              ['📋', `${s!.lists.length} list${s!.lists.length === 1 ? '' : 's'}`, s!.lists.join(' · ') || '—'],
+            ].map(([icon, title, sub]) => (
+              <li key={title} className="bg-sand-100 rounded-2xl p-3">
+                <p className="font-semibold text-sand-900">
+                  {icon} {title}
+                </p>
+                <p className="text-[10px] text-sand-800/60 mt-0.5">{sub}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sand-800/70">
+            <strong>{n(s!.newFilms)}</strong> new {s!.newFilms === 1 ? 'film' : 'films'} will be added
+            {s!.updatedFilms > 0 && (
+              <>
+                , <strong>{n(s!.updatedFilms)}</strong> already in your library will be updated
+              </>
+            )}
+            {s!.unchangedFilms > 0 && <> ({n(s!.unchangedFilms)} already up to date)</>}.
           </p>
 
-          <div className="max-h-72 overflow-y-auto space-y-1.5 border border-sand-200 rounded-2xl p-2">
-            {reviewRows.map((r, i) => (
-              <label
-                key={r.group.key}
-                className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-sand-50 cursor-pointer"
-              >
-                <input type="checkbox" checked={r.selected} onChange={() => toggleRow(i)} className="shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sand-900 truncate">
-                    {r.group.title} {r.group.year ? `(${r.group.year})` : ''}
-                  </p>
-                  <p className="text-[10px] text-sand-800/60">
-                    {r.group.rows.length} watch{r.group.rows.length === 1 ? '' : 'es'}
-                    {r.duplicate ? ' · already in your library — will merge' : ''}
-                  </p>
-                </div>
-              </label>
-            ))}
-          </div>
+          {error && <p className="text-terracotta-600 bg-terracotta-100 px-3 py-2 rounded-xl">{error}</p>}
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={confirmImport}
-              disabled={importing || selectedCount === 0}
+              disabled={!!busy || s!.newFilms + s!.updatedFilms === 0}
               className="flex-1 py-3 bg-terracotta-400 hover:bg-terracotta-600 disabled:opacity-50 text-white font-semibold rounded-2xl"
             >
-              {importing ? 'Importing…' : `Import ${selectedCount} film${selectedCount === 1 ? '' : 's'}`}
+              {busy ?? (s!.newFilms + s!.updatedFilms === 0 ? 'Everything is up to date' : 'Import')}
             </button>
             <button onClick={onClose} className="flex-1 sm:flex-none px-5 py-3 bg-sand-100 hover:bg-sand-200 text-sand-900 font-semibold rounded-2xl">
               Cancel

@@ -1,162 +1,380 @@
-import type { MovieItem, MovieWatchEntry, LifeItemPatch } from '@/db/schema';
+import type { LifeItemPatch, MovieItem, MovieListEntry, MovieWatchEntry } from '@/db/schema';
 import { generateId } from '@/db/id';
 import { parseCsv } from '@/shared/utils/csv';
 
 /**
- * Letterboxd → A Little Better is a ONE-WAY import of the diary.csv
- * file from a Letterboxd "Export Data" download. There is no
- * official public API for personal data, so this deliberately never
- * talks to letterboxd.com — it only parses a file the person
- * downloaded themselves.
+ * Letterboxd → A Little Better: a ONE-WAY import of the folder you get
+ * from Letterboxd's "Export Your Data" (unzipped). There is no public
+ * API for personal data, so this never talks to letterboxd.com — it
+ * only reads files the person downloaded themselves.
  *
- * Expected header (Letterboxd's actual diary.csv format):
- *   Date,Name,Year,Letterboxd URI,Rating,Rewatch,Tags,Watched Date
+ * Files used (anything else — comments, profile, deleted/, orphaned/,
+ * likes on other people's reviews and lists — is ignored):
  *
- * A diary export naturally contains one row per WATCH, so the same
- * film can appear several times (each rewatch is its own row). Rows
- * are grouped by film below so a rewatched film becomes one movie
- * with a full watch history, instead of several duplicate entries.
+ *   diary.csv        one row per logged watch, with date / rating / rewatch / tags
+ *   reviews.csv      review text, tied to a watch by its watched date
+ *   watched.csv      every film marked watched — including ones never logged in the diary (no date)
+ *   ratings.csv      current star rating per film
+ *   likes/films.csv  liked films  → ♥ favorite
+ *   watchlist.csv    want-to-watch → status 'watchlist'
+ *   lists/*.csv      the person's own lists, with each film's position
+ *
+ * Films are matched across files (and against movies already in the
+ * app) by title + year: diary/review rows carry a per-LOG link, not the
+ * film's link, so the Letterboxd URI can't be used to group rewatches.
+ * Re-running an import merges into what's there and never duplicates.
  */
 
-export interface ParsedLetterboxdRow {
-  title: string;
-  year?: number;
-  watchedDate?: string;
+export type ExportFileKind = 'diary' | 'reviews' | 'watched' | 'ratings' | 'likes' | 'watchlist' | 'list';
+
+export interface ExportFile {
+  /** Path inside the export folder (e.g. "likes/films.csv") — or just the file name. */
+  path: string;
+  text: string;
+}
+
+export interface LetterboxdWatch {
+  date?: string;
   rating?: number;
+  review?: string;
   rewatch: boolean;
-  tags: string[];
-  letterboxdUri?: string;
 }
 
-export function parseLetterboxdDiaryCsv(csvText: string): ParsedLetterboxdRow[] {
-  const rows = parseCsv(csvText);
-  if (rows.length === 0) return [];
-
-  const header = rows[0].map((h) => h.trim().toLowerCase());
-  const col = (name: string) => header.indexOf(name);
-
-  const nameIdx = col('name');
-  const yearIdx = col('year');
-  const uriIdx = col('letterboxd uri');
-  const ratingIdx = col('rating');
-  const rewatchIdx = col('rewatch');
-  const tagsIdx = col('tags');
-  const watchedDateIdx = col('watched date');
-
-  if (nameIdx === -1) {
-    throw new Error("This doesn't look like a Letterboxd diary.csv file (no 'Name' column found).");
-  }
-
-  return rows.slice(1).map((cells) => {
-    const title = cells[nameIdx]?.trim() ?? '';
-    const yearRaw = yearIdx !== -1 ? cells[yearIdx]?.trim() : '';
-    const ratingRaw = ratingIdx !== -1 ? cells[ratingIdx]?.trim() : '';
-    const tagsRaw = tagsIdx !== -1 ? cells[tagsIdx]?.trim() : '';
-
-    return {
-      title,
-      year: yearRaw ? Number(yearRaw) : undefined,
-      watchedDate: watchedDateIdx !== -1 ? cells[watchedDateIdx]?.trim() || undefined : undefined,
-      rating: ratingRaw ? Number(ratingRaw) : undefined,
-      rewatch: rewatchIdx !== -1 ? cells[rewatchIdx]?.trim().toLowerCase() === 'yes' : false,
-      tags: tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : [],
-      letterboxdUri: uriIdx !== -1 ? cells[uriIdx]?.trim() || undefined : undefined,
-    };
-  }).filter((row) => row.title.length > 0);
-}
-
-export interface GroupedLetterboxdFilm {
+export interface LetterboxdFilm {
   key: string;
   title: string;
   year?: number;
-  letterboxdUri?: string;
-  /** All watches of this film found in the CSV, oldest first. */
-  rows: ParsedLetterboxdRow[];
+  /** The film's own Letterboxd link (from watched / ratings / likes / watchlist). */
+  uri?: string;
+  watches: LetterboxdWatch[];
+  /** Current rating from ratings.csv. */
+  rating?: number;
+  liked: boolean;
+  onWatchlist: boolean;
+  /** Seen, per Letterboxd (watched.csv, a like, a rating, a list) — even with no diary entry. */
+  seen: boolean;
+  lists: MovieListEntry[];
+  tags: string[];
 }
 
-/** Groups diary rows by film (via Letterboxd URI, or title+year as a fallback) so rewatches become one entry with history, not duplicates. */
-export function groupRowsByFilm(rows: ParsedLetterboxdRow[]): GroupedLetterboxdFilm[] {
-  const map = new Map<string, GroupedLetterboxdFilm>();
-  for (const row of rows) {
-    const key = row.letterboxdUri ?? `${row.title.trim().toLowerCase()}|${row.year ?? ''}`;
-    const existing = map.get(key);
-    if (existing) {
-      existing.rows.push(row);
+export interface LetterboxdExport {
+  films: LetterboxdFilm[];
+  /** Which kinds of file were found and used. */
+  kinds: ExportFileKind[];
+  listNames: string[];
+}
+
+/** Which part of the export a file is, from its path — or null for files that aren't imported. */
+export function classifyExportFile(path: string): ExportFileKind | null {
+  const parts = path.toLowerCase().replace(/\\/g, '/').split('/').filter(Boolean);
+  if (parts.some((p) => p === 'deleted' || p === 'orphaned')) return null;
+  const name = parts[parts.length - 1] ?? '';
+  const parent = parts[parts.length - 2];
+  if (!name.endsWith('.csv')) return null;
+  if (parent === 'likes') return name === 'films.csv' ? 'likes' : null;
+  if (parent === 'lists') return 'list';
+  const top: Record<string, ExportFileKind> = {
+    'diary.csv': 'diary',
+    'reviews.csv': 'reviews',
+    'watched.csv': 'watched',
+    'ratings.csv': 'ratings',
+    'watchlist.csv': 'watchlist',
+  };
+  return top[name] ?? null;
+}
+
+const normTitle = (t: string) => t.trim().toLowerCase().replace(/\s+/g, ' ');
+export const filmKey = (title: string, year?: number) => `${normTitle(title)}|${year ?? ''}`;
+
+const num = (s?: string) => {
+  const v = s?.trim();
+  return v ? Number(v) : undefined;
+};
+
+/** Letterboxd reviews are exported as light HTML — turn them into plain text. */
+export function cleanReview(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** Rows of a simple export CSV as objects keyed by lower-cased header. */
+function records(text: string): Record<string, string>[] {
+  const rows = parseCsv(text);
+  if (rows.length === 0) return [];
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  return rows.slice(1).map((cells) => Object.fromEntries(header.map((h, i) => [h, cells[i]?.trim() ?? ''])));
+}
+
+/**
+ * A list export: a "Letterboxd list export" line, the list's own
+ * header + row (Date, Name, Tags, URL, Description), a blank line,
+ * then Position, Name, Year, URL, Description for each film.
+ */
+function parseList(text: string, fallbackName: string): { name: string; films: { title: string; year?: number; position?: number }[] } {
+  const rows = parseCsv(text);
+  const metaHeader = rows.findIndex((r) => r[0]?.trim().toLowerCase() === 'date' && r.some((c) => c.trim().toLowerCase() === 'name'));
+  let name = fallbackName;
+  if (metaHeader !== -1 && rows[metaHeader + 1]) {
+    const nameCol = rows[metaHeader].findIndex((c) => c.trim().toLowerCase() === 'name');
+    name = rows[metaHeader + 1][nameCol]?.trim() || fallbackName;
+  }
+  const filmHeader = rows.findIndex((r) => r[0]?.trim().toLowerCase() === 'position');
+  if (filmHeader === -1) return { name, films: [] };
+  const h = rows[filmHeader].map((c) => c.trim().toLowerCase());
+  const at = (r: string[], col: string) => r[h.indexOf(col)]?.trim();
+  return {
+    name,
+    films: rows
+      .slice(filmHeader + 1)
+      .map((r) => ({ title: at(r, 'name') ?? '', year: num(at(r, 'year')), position: num(at(r, 'position')) }))
+      .filter((f) => f.title),
+  };
+}
+
+const listNameFromPath = (path: string) =>
+  (path.split('/').pop() ?? path)
+    .replace(/\.csv$/i, '')
+    .replace(/-/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase());
+
+export function parseLetterboxdExport(files: ExportFile[]): LetterboxdExport {
+  const films = new Map<string, LetterboxdFilm>();
+  const film = (title: string, year?: number): LetterboxdFilm => {
+    const key = filmKey(title, year);
+    let f = films.get(key);
+    if (!f) {
+      f = { key, title: title.trim(), year, watches: [], liked: false, onWatchlist: false, seen: false, lists: [], tags: [] };
+      films.set(key, f);
+    }
+    return f;
+  };
+
+  const byKind = new Map<ExportFileKind, ExportFile[]>();
+  for (const file of files) {
+    const kind = classifyExportFile(file.path);
+    if (kind) byKind.set(kind, [...(byKind.get(kind) ?? []), file]);
+  }
+  const each = (kind: ExportFileKind, fn: (r: Record<string, string>) => void) => {
+    for (const file of byKind.get(kind) ?? []) records(file.text).forEach((r) => r.name && fn(r));
+  };
+
+  // Diary first — every logged watch.
+  each('diary', (r) => {
+    const f = film(r.name, num(r.year));
+    f.watches.push({ date: r['watched date'] || r.date || undefined, rating: num(r.rating), rewatch: r.rewatch?.toLowerCase() === 'yes' });
+    if (r.tags) for (const t of r.tags.split(',').map((x) => x.trim()).filter(Boolean)) if (!f.tags.includes(t)) f.tags.push(t);
+  });
+  // Reviews attach to the watch on the same date (or become a watch of their own).
+  each('reviews', (r) => {
+    const f = film(r.name, num(r.year));
+    const date = r['watched date'] || undefined;
+    const review = cleanReview(r.review ?? '');
+    const watch = f.watches.find((w) => w.date === date && !w.review);
+    if (watch) {
+      if (review) watch.review = review;
+      watch.rating ??= num(r.rating);
     } else {
-      map.set(key, { key, title: row.title, year: row.year, letterboxdUri: row.letterboxdUri, rows: [row] });
+      f.watches.push({ date, rating: num(r.rating), review: review || undefined, rewatch: r.rewatch?.toLowerCase() === 'yes' });
+    }
+  });
+  each('watched', (r) => {
+    const f = film(r.name, num(r.year));
+    f.seen = true;
+    f.uri = r['letterboxd uri'] || f.uri;
+  });
+  each('ratings', (r) => {
+    const f = film(r.name, num(r.year));
+    f.rating = num(r.rating);
+    f.seen = true;
+    f.uri ??= r['letterboxd uri'] || undefined;
+  });
+  each('likes', (r) => {
+    const f = film(r.name, num(r.year));
+    f.liked = true;
+    f.seen = true;
+    f.uri ??= r['letterboxd uri'] || undefined;
+  });
+  each('watchlist', (r) => {
+    const f = film(r.name, num(r.year));
+    f.onWatchlist = true;
+    f.uri ??= r['letterboxd uri'] || undefined;
+  });
+  const listNames: string[] = [];
+  for (const file of byKind.get('list') ?? []) {
+    const list = parseList(file.text, listNameFromPath(file.path));
+    if (!list.films.length) continue;
+    listNames.push(list.name);
+    for (const lf of list.films) {
+      const f = film(lf.title, lf.year);
+      if (!f.lists.some((l) => l.name === list.name)) f.lists.push({ name: list.name, position: lf.position });
     }
   }
-  for (const group of map.values()) {
-    group.rows.sort((a, b) => (a.watchedDate ?? '').localeCompare(b.watchedDate ?? ''));
-  }
-  return Array.from(map.values());
+
+  for (const f of films.values()) f.watches.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
+  return { films: [...films.values()], kinds: [...byKind.keys()], listNames };
 }
 
-/** A group counts as a likely duplicate if it matches an existing movie by Letterboxd URI, or by title+year. */
-export function findExistingDuplicate(group: GroupedLetterboxdFilm, existing: MovieItem[]): MovieItem | undefined {
-  if (group.letterboxdUri) {
-    const byUri = existing.find((m) => m.letterboxdUri === group.letterboxdUri);
-    if (byUri) return byUri;
-  }
-  return existing.find(
-    (m) => m.title.trim().toLowerCase() === group.title.trim().toLowerCase() && m.year === group.year,
-  );
-}
+/** Watched (has watches, or Letterboxd says it was seen, or it's on one of their lists) — otherwise a watchlist film. */
+export const isWatched = (f: LetterboxdFilm) => f.watches.length > 0 || f.seen || f.lists.length > 0;
 
-function rowToWatchEntry(row: ParsedLetterboxdRow): MovieWatchEntry {
-  return { id: generateId(), dateWatched: row.watchedDate, rating: row.rating, source: 'letterboxd' };
-}
+type NewMovieInput = Omit<MovieItem, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>;
 
-/** Builds a brand-new movie from a group — the most recent watch becomes the top-level fields, earlier ones go into previousWatches. */
-export function groupToNewMovieInput(
-  group: GroupedLetterboxdFilm,
-): Omit<MovieItem, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'type'> {
-  const ordered = group.rows; // ascending
-  const latest = ordered[ordered.length - 1];
-  const earlier = ordered.slice(0, -1);
+const toEntry = (w: { date?: string; rating?: number; review?: string }): MovieWatchEntry => ({
+  id: generateId(),
+  dateWatched: w.date,
+  rating: w.rating,
+  review: w.review,
+  source: 'letterboxd',
+});
 
+/** A brand-new movie: the latest watch becomes the top-level fields; earlier ones go into previousWatches. */
+export function filmToNewMovie(f: LetterboxdFilm): NewMovieInput {
+  const base = { type: 'movie' as const, title: f.title, year: f.year, letterboxdUri: f.uri, source: 'letterboxd' as const };
+  if (!isWatched(f)) return { ...base, status: 'watchlist' };
+  const latest = f.watches[f.watches.length - 1];
+  const earlier = f.watches.slice(0, -1);
   return {
-    title: group.title,
-    year: group.year,
-    dateWatched: latest.watchedDate,
-    rating: latest.rating,
-    rewatch: ordered.length > 1,
-    tags: latest.tags.length ? latest.tags : undefined,
-    letterboxdUri: group.letterboxdUri,
-    previousWatches: earlier.length ? earlier.map(rowToWatchEntry) : undefined,
-    source: 'letterboxd',
+    ...base,
+    status: 'watched',
+    dateWatched: latest?.date,
+    rating: f.rating ?? latest?.rating,
+    review: latest?.review,
+    rewatch: f.watches.length > 1 || f.watches.some((w) => w.rewatch) || undefined,
+    tags: f.tags.length ? f.tags : undefined,
+    favorite: f.liked || undefined,
+    lists: f.lists.length ? f.lists : undefined,
+    previousWatches: earlier.length ? earlier.map(toEntry) : undefined,
   };
 }
 
 /**
- * Merges a group's watches into an already-existing movie: any
- * watchedDate already on record (top-level or in previousWatches) is
- * skipped, so re-running an import never creates duplicate watches.
- * Returns a patch ready for updateLifeItem, or undefined if there's
- * genuinely nothing new to add.
+ * Merges a film into a movie already in the app. New watch dates are
+ * added, a missing review/rating is filled in, a like adds ♥, lists are
+ * combined, and a watchlist movie becomes watched once it has been
+ * seen. Nothing the person already has is overwritten or removed.
+ * Returns undefined when there's nothing new.
  */
-export function mergeGroupIntoExisting(existing: MovieItem, group: GroupedLetterboxdFilm): LifeItemPatch | undefined {
-  const knownDates = new Set<string>();
-  if (existing.dateWatched) knownDates.add(existing.dateWatched);
-  for (const w of existing.previousWatches ?? []) if (w.dateWatched) knownDates.add(w.dateWatched);
+export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm): LifeItemPatch | undefined {
+  type W = { date?: string; rating?: number; review?: string };
+  const current: W[] = [
+    ...(existing.previousWatches ?? []).map((w) => ({ date: w.dateWatched, rating: w.rating, review: w.review })),
+    ...(existing.dateWatched || existing.rating != null || existing.review ? [{ date: existing.dateWatched, rating: existing.rating, review: existing.review }] : []),
+  ];
+  const combined = current.map((w) => ({ ...w }));
+  for (const w of f.watches) {
+    const same = combined.find((c) => c.date === w.date);
+    if (same) {
+      same.review ||= w.review;
+      same.rating ??= w.rating;
+    } else if (w.date || combined.length === 0) {
+      combined.push({ date: w.date, rating: w.rating, review: w.review });
+    }
+  }
+  combined.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
 
-  const newRows = group.rows.filter((r) => !r.watchedDate || !knownDates.has(r.watchedDate));
-  if (newRows.length === 0) return undefined;
+  const lists = [...(existing.lists ?? [])];
+  for (const l of f.lists) {
+    const i = lists.findIndex((x) => x.name === l.name);
+    if (i === -1) lists.push(l);
+    else lists[i] = { ...lists[i], position: l.position ?? lists[i].position };
+  }
 
-  const combined = [
-    ...(existing.previousWatches ?? []).map((w) => ({ dateWatched: w.dateWatched, rating: w.rating })),
-    { dateWatched: existing.dateWatched, rating: existing.rating },
-    ...newRows.map((r) => ({ dateWatched: r.watchedDate, rating: r.rating })),
-  ].sort((a, b) => (a.dateWatched ?? '').localeCompare(b.dateWatched ?? ''));
-
+  const watched = isWatched(f) || existing.status !== 'watchlist';
   const latest = combined[combined.length - 1];
-  const earlier = combined.slice(0, -1);
+  const next = {
+    status: existing.status === 'watchlist' && watched ? ('watched' as const) : existing.status,
+    dateWatched: latest?.date,
+    rating: existing.rating ?? f.rating ?? latest?.rating,
+    review: latest?.review,
+    rewatch: combined.length > 1 || existing.rewatch || f.watches.some((w) => w.rewatch) || undefined,
+    favorite: existing.favorite || f.liked || undefined,
+    lists: lists.length ? lists : undefined,
+    letterboxdUri: f.uri ?? existing.letterboxdUri,
+    tags: existing.tags?.length ? existing.tags : f.tags.length ? f.tags : undefined,
+  };
+  const before = {
+    status: existing.status,
+    dateWatched: existing.dateWatched,
+    rating: existing.rating,
+    review: existing.review,
+    rewatch: existing.rewatch || undefined,
+    favorite: existing.favorite || undefined,
+    lists: existing.lists?.length ? existing.lists : undefined,
+    letterboxdUri: existing.letterboxdUri,
+    tags: existing.tags?.length ? existing.tags : undefined,
+  };
+  const watchesChanged = JSON.stringify(combined) !== JSON.stringify(current);
+  if (!watchesChanged && JSON.stringify(next) === JSON.stringify(before)) return undefined;
 
   return {
     type: 'movie',
-    dateWatched: latest.dateWatched,
-    rating: latest.rating,
-    rewatch: combined.length > 1,
-    previousWatches: earlier.map((e) => ({ id: generateId(), dateWatched: e.dateWatched, rating: e.rating, source: 'letterboxd' })),
+    ...next,
+    previousWatches: watchesChanged ? combined.slice(0, -1).map(toEntry) : existing.previousWatches,
+  };
+}
+
+export interface ImportPlan {
+  creates: NewMovieInput[];
+  updates: { id: string; patch: LifeItemPatch }[];
+  summary: {
+    films: number;
+    newFilms: number;
+    updatedFilms: number;
+    unchangedFilms: number;
+    watched: number;
+    dated: number;
+    watches: number;
+    reviews: number;
+    favorites: number;
+    watchlist: number;
+    lists: string[];
+  };
+}
+
+/** Works out exactly what an import will add and change — pure, so it can be shown before anything is written. */
+export function planImport(exp: LetterboxdExport, existingMovies: MovieItem[]): ImportPlan {
+  const existing = new Map<string, MovieItem>();
+  for (const m of existingMovies) if (!m.deletedAt) existing.set(filmKey(m.title, m.year), m);
+
+  const creates: NewMovieInput[] = [];
+  const updates: ImportPlan['updates'] = [];
+  let unchanged = 0;
+  for (const f of exp.films) {
+    const match = existing.get(f.key);
+    if (!match) creates.push(filmToNewMovie(f));
+    else {
+      const patch = mergeFilmIntoExisting(match, f);
+      if (patch) updates.push({ id: match.id, patch });
+      else unchanged++;
+    }
+  }
+  const watchedFilms = exp.films.filter(isWatched);
+  return {
+    creates,
+    updates,
+    summary: {
+      films: exp.films.length,
+      newFilms: creates.length,
+      updatedFilms: updates.length,
+      unchangedFilms: unchanged,
+      watched: watchedFilms.length,
+      dated: watchedFilms.filter((f) => f.watches.some((w) => w.date)).length,
+      watches: exp.films.reduce((s, f) => s + f.watches.filter((w) => w.date).length, 0),
+      reviews: exp.films.reduce((s, f) => s + f.watches.filter((w) => w.review).length, 0),
+      favorites: exp.films.filter((f) => f.liked).length,
+      watchlist: exp.films.filter((f) => !isWatched(f)).length,
+      lists: exp.listNames,
+    },
   };
 }

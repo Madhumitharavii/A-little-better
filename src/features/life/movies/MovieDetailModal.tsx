@@ -13,9 +13,10 @@ interface MovieDetailModalProps {
   onToggleFavorite: () => void;
   onDelete: () => void;
   onLogRewatch: () => void;
+  onMarkWatched: () => void;
 }
 
-export default function MovieDetailModal({ movie, onClose, onEdit, onToggleFavorite, onDelete, onLogRewatch }: MovieDetailModalProps) {
+export default function MovieDetailModal({ movie, onClose, onEdit, onToggleFavorite, onDelete, onLogRewatch, onMarkWatched }: MovieDetailModalProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const posterUrl = useLifeImageUrl(movie.posterImageId);
   const watchNumber = (movie.previousWatches?.length ?? 0) + 1;
@@ -46,6 +47,15 @@ export default function MovieDetailModal({ movie, onClose, onEdit, onToggleFavor
             {movie.status === 'didNotFinish' && (
               <span className="text-[10px] bg-sand-200 text-sand-800 px-2 py-0.5 rounded-full">Did Not Finish</span>
             )}
+            {movie.status === 'watchlist' && (
+              <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">🍿 On my watchlist</span>
+            )}
+            {movie.lists?.map((l) => (
+              <span key={l.name} className="text-[10px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded-full">
+                📋 {l.name}
+                {l.position ? ` · #${l.position}` : ''}
+              </span>
+            ))}
             {movie.favorite && <span className="text-[10px] bg-terracotta-100 text-terracotta-600 px-2 py-0.5 rounded-full">♥ Favorite</span>}
             {movie.source === 'letterboxd' && (
               <span className="text-[10px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded-full">From Letterboxd</span>
@@ -90,9 +100,15 @@ export default function MovieDetailModal({ movie, onClose, onEdit, onToggleFavor
         </a>
       )}
 
-      <button onClick={onLogRewatch} className="w-full py-2.5 bg-sage-100 hover:bg-sage-300/40 text-sage-700 text-xs font-semibold rounded-2xl">
-        🔁 Log a rewatch
-      </button>
+      {movie.status === 'watchlist' ? (
+        <button onClick={onMarkWatched} className="w-full py-2.5 bg-sage-100 hover:bg-sage-300/40 text-sage-700 text-xs font-semibold rounded-2xl">
+          ✓ I watched it
+        </button>
+      ) : (
+        <button onClick={onLogRewatch} className="w-full py-2.5 bg-sage-100 hover:bg-sage-300/40 text-sage-700 text-xs font-semibold rounded-2xl">
+          🔁 Log a rewatch
+        </button>
+      )}
 
       <div className="flex gap-3 pt-2">
         <button onClick={onEdit} className="flex-1 py-2.5 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl">

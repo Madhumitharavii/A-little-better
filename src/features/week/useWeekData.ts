@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { getAllCareEntries } from '@/db/repositories/careRepository';
 import { getJournalEntries } from '@/db/repositories/journalRepository';
 import { getLifeItems } from '@/db/repositories/lifeRepository';
+import { lifeItemActivityDates } from '@/db/lifeDates';
 import { getLocalDateKey, addDays } from '@/db/dateUtils';
 import type { CareEntry, JournalEntry, LifeItem } from '@/db/schema';
 
@@ -22,13 +23,7 @@ export interface WeekData {
 }
 
 function lifeItemDateInWeek(item: LifeItem, weekDates: Set<string>): boolean {
-  const candidates: (string | undefined)[] = [item.createdAt.slice(0, 10)];
-  if (item.type === 'book') candidates.push(item.dateFinished, item.dateStarted);
-  if (item.type === 'movie') candidates.push(item.dateWatched);
-  if (item.type === 'series') candidates.push(item.dateFinished, item.dateStarted);
-  if (item.type === 'artwork') candidates.push(item.dateCreated);
-  if (item.type === 'experience') candidates.push(item.date);
-  return candidates.some((d) => d && weekDates.has(d));
+  return lifeItemActivityDates(item).some((d) => weekDates.has(d));
 }
 
 export function useWeekData(today: string = getLocalDateKey()): WeekData {

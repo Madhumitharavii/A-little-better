@@ -39,7 +39,7 @@ The interface, visual language, prompts, and interactions are intentionally pers
 ### Life
 A personal collection, grouped into **My archive** and **Looking ahead**:
 - **Books** — reading records, re-reads, and Goodreads CSV import
-- **Movies** — watch records, ratings, rewatches, and Letterboxd import
+- **Movies** — watch records, ratings, rewatches, reviews, a watchlist and lists, with a full **Letterboxd export import** (diary, every watched film, reviews, ratings, liked films → favorites, watchlist, lists), matched by title + year so re-running it merges instead of duplicating
 - **Series** — shows, seasons and episode tracking
 - **Artwork** and **Experiences** — with photos
 - **Someday, Maybe** and **Annual Vision** — things to try, and this year's intentions
@@ -177,7 +177,7 @@ supabase/                SQL migrations and sync documentation
 - **Cloud (optional):** Supabase — Auth, Postgres with Row Level Security, Storage
 - **On-device AI:** Transformers.js, ONNX Runtime Web (WebAssembly), all-MiniLM-L6-v2
 - **Testing:** Vitest with fake-indexeddb
-- **Imports:** Goodreads and Letterboxd CSV
+- **Imports:** Goodreads CSV, and the whole unzipped Letterboxd export folder
 
 ## Testing
 
@@ -187,7 +187,7 @@ npm run eval    # just the emotion-classifier evaluation
 npm run train:emotion   # retrain the emotion head (writes src/features/ai/emotionHead.json)
 ```
 
-The suites run the real sync engine against an in-memory database and a mock Supabase that assigns its own server timestamps — covering first sync, conflicts, delete propagation, duplicate resolution, clock skew, and error messages — plus the advisor's rules and non-repetition, the study log, weekly goals, the daily-thought rotation, the ML maths (clustering, silhouette, keywords, emotion prototypes, softmax regression), and the real on-device model (meaning search, emotion reading — including negation like "didn't cry" — and theme grouping).
+The suites run the real sync engine against an in-memory database and a mock Supabase that assigns its own server timestamps — covering first sync, conflicts, delete propagation, duplicate resolution, clock skew, error messages, and paging past Supabase's 1000-row limit — plus the Letterboxd importer (rewatch grouping, review matching, re-run safety), the advisor's rules and non-repetition, the study log, weekly goals, the daily-thought rotation, the ML maths (clustering, silhouette, keywords, emotion prototypes, softmax regression), and the real on-device model (meaning search, emotion reading — including negation like "didn't cry" — and theme grouping).
 
 ## Data & Privacy
 

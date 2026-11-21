@@ -88,6 +88,15 @@ export default function MovieEditorModal({ existing, onClose, onSave }: MovieEdi
         >
           {status === 'didNotFinish' ? '✓ Marked as Did Not Finish' : 'Mark as Did Not Finish'}
         </button>
+        <button
+          type="button"
+          onClick={() => setStatus(status === 'watchlist' ? undefined : 'watchlist')}
+          className={`w-full py-2.5 rounded-2xl border font-semibold transition-all ${
+            status === 'watchlist' ? 'bg-sand-900 text-white border-sand-900' : 'bg-sand-50 border-sand-200 text-sand-800'
+          }`}
+        >
+          {status === 'watchlist' ? '✓ On my watchlist (not watched yet)' : '🍿 Add to watchlist instead'}
+        </button>
 
         <div>
           <label className="block font-semibold text-sand-900 mb-1">My thoughts</label>
