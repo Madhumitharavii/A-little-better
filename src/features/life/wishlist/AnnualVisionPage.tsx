@@ -6,6 +6,7 @@ import { formatDisplayDate } from '@/shared/utils/formatDate';
 import type { BookItem, WishItem } from '@/db/schema';
 import WishEditorModal from './WishEditorModal';
 import VisionPasteModal from './VisionPasteModal';
+import AchievedStoryModal from './AchievedStoryModal';
 import { booksFinishedIn, readingGoalTarget } from './visionList';
 import ConfirmInline from '@/shared/components/ConfirmInline';
 
@@ -22,11 +23,12 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [justCompletedId, setJustCompletedId] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
+  const [storyFor, setStoryFor] = useState<{ wish: WishItem; mode: 'complete' | 'story' } | null>(null);
   const books = useLifeItemsOfType('book') as BookItem[];
 
   const currentYear = new Date().getFullYear();
   // Same year: in the order they were added (so a pasted list keeps its order).
-  const pending = wishes.filter((w) => !w.done).sort((a, b) => (a.year ?? 0) - (b.year ?? 0) || a.createdAt.localeCompare(b.createdAt));
+  const pending = wishes.filter((w) => !w.done && !w.missed).sort((a, b) => (a.year ?? 0) - (b.year ?? 0) || a.createdAt.localeCompare(b.createdAt));
   /** A goal like "Read 12 books" → progress from the Books section. */
   const readingProgress = (wish: WishItem) => {
     const target = readingGoalTarget(wish.title);
@@ -35,32 +37,30 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
     return { read, target, pct: Math.min(100, Math.round((read / target) * 100)) };
   };
   const done = wishes.filter((w) => w.done);
+  const missed = wishes.filter((w) => w.missed && !w.done);
+
+  const markMissed = async (wish: WishItem) => {
+    await updateLifeItem(wish.id, { type: 'wish', missed: true, dateMissed: getLocalDateKey() });
+    showToast("Moved to Missed. That's okay, some things only fit a moment.");
+  };
+  const undoMissed = async (wish: WishItem) => {
+    await updateLifeItem(wish.id, { type: 'wish', missed: false, dateMissed: undefined });
+  };
+  const tryNextYear = async (wish: WishItem) => {
+    const next = (wish.year ?? currentYear) + 1;
+    await updateLifeItem(wish.id, { type: 'wish', missed: false, dateMissed: undefined, year: next });
+    showToast(`Moved to ${next} 🌱`);
+  };
 
   const toggleDone = async (wish: WishItem) => {
-    const nowDone = !wish.done;
-    await updateLifeItem(wish.id, {
-      type: 'wish',
-      done: nowDone,
-      dateCompleted: nowDone ? getLocalDateKey() : undefined,
-    });
-    if (nowDone) {
-      showToast(`🤜🤛 ${wish.title} — vision achieved!`);
-      setJustCompletedId(wish.id);
-      setTimeout(() => setJustCompletedId((current) => (current === wish.id ? null : current)), 2000);
+    if (!wish.done) {
+      // Ticking it off: ask when it happened and (optionally) for the story.
+      setStoryFor({ wish, mode: 'complete' });
+      return;
     }
+    await updateLifeItem(wish.id, { type: 'wish', done: false, dateCompleted: undefined });
   };
 
-  const logAsExperience = async (wish: WishItem) => {
-    const experience = await createLifeItem({
-      type: 'experience',
-      title: wish.title,
-      description: wish.notes,
-      date: wish.dateCompleted ?? getLocalDateKey(),
-      favorite: wish.favorite,
-    });
-    await updateLifeItem(wish.id, { type: 'wish', linkedExperienceId: experience.id });
-    showToast('Logged as an Experience 🌿');
-  };
 
   return (
     <div className="space-y-5">
@@ -102,13 +102,13 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
                 >
                   <button
                     onClick={() => toggleDone(wish)}
-                    className="w-8 h-8 shrink-0 rounded-full border-2 border-sand-300 hover:border-terracotta-400 flex items-center justify-center text-sm"
+                    className="group w-7 h-7 shrink-0 rounded-full border-2 border-sand-300 hover:border-sage-500 hover:bg-sage-100 flex items-center justify-center text-xs transition-colors"
                     aria-label="Mark as achieved"
                   >
-                    🎯
+                    <span className="text-sage-700 opacity-0 group-hover:opacity-100 transition-opacity">✓</span>
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-sand-900 truncate">{wish.title}</p>
+                    <p className="text-sm font-semibold text-sand-900 leading-snug break-words">{wish.title}</p>
                     <p className="text-[11px] text-sand-800/50">
                       {wish.year ?? currentYear}
                       {wish.category ? ` · ${wish.category}` : ''}
@@ -128,6 +128,13 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
                     })()}
                   </div>
                   {wish.favorite && <span className="text-terracotta-400 text-sm shrink-0">♥</span>}
+                  <button
+                    onClick={() => markMissed(wish)}
+                    className="text-sand-800/50 hover:text-sand-900 text-[11px] px-1 shrink-0"
+                    title="Can't happen this time"
+                  >
+                    Missed
+                  </button>
                   <button onClick={() => setEditing(wish)} className="text-sand-800/50 hover:text-sand-900 text-[11px] px-1 shrink-0">
                     Edit
                   </button>
@@ -146,25 +153,57 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
                 <div key={wish.id} className="flex items-center gap-3 p-3 bg-terracotta-100/50 rounded-2xl border border-terracotta-400/30">
                   <button
                     onClick={() => toggleDone(wish)}
-                    className="w-8 h-8 shrink-0 rounded-full bg-terracotta-400 text-white flex items-center justify-center text-sm"
+                    className="w-7 h-7 shrink-0 rounded-full bg-terracotta-400 text-white flex items-center justify-center text-xs"
                     aria-label="Mark as not achieved"
                   >
                     ✓
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-sand-900 line-through decoration-terracotta-400/50 truncate">{wish.title}</p>
+                    <p className="text-sm font-semibold text-sand-900 line-through decoration-terracotta-400/50 leading-snug break-words">{wish.title}</p>
                     <p className="text-[11px] text-sand-800/50">
                       {wish.year ?? ''} {wish.dateCompleted ? `· achieved ${formatDisplayDate(wish.dateCompleted)}` : ''}
+                      {wish.linkedJournalId ? ' · 📓 in journal' : ''}
+                      {wish.linkedExperienceId ? ' · 🌿 in experiences' : ''}
+                    </p>
+                    {wish.story && <p className="text-[11px] text-sand-800/70 italic mt-1 line-clamp-2 whitespace-pre-line">“{wish.story}”</p>}
+                  </div>
+                  <button
+                    onClick={() => setStoryFor({ wish, mode: 'story' })}
+                    className="text-[10px] bg-white hover:bg-sand-50 border border-sand-200 text-sand-800 px-2 py-1.5 rounded-lg shrink-0"
+                  >
+                    {wish.story ? '✍️ Story' : '✍️ Add story'}
+                  </button>
+                  <button onClick={() => setConfirmDeleteId(wish.id)} className="text-sand-800/50 hover:text-terracotta-600 text-[11px] px-1 shrink-0">
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {missed.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60 pt-2">Missed this time 🌧️</h3>
+              <p className="text-[11px] text-sand-800/50 -mt-1">That's okay. Some things only fit a moment. Try again next year, or let them go.</p>
+              {missed.map((wish) => (
+                <div key={wish.id} className="flex items-center gap-3 p-3 bg-sand-100/60 rounded-2xl border border-sand-200">
+                  <span className="w-7 h-7 shrink-0 rounded-full border-2 border-dashed border-sand-300" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-sand-800/70 leading-snug break-words">{wish.title}</p>
+                    <p className="text-[11px] text-sand-800/50">
+                      {wish.year ?? currentYear}
+                      {wish.category ? ` · ${wish.category}` : ''}
                     </p>
                   </div>
-                  {!wish.linkedExperienceId && (
-                    <button
-                      onClick={() => logAsExperience(wish)}
-                      className="text-[10px] bg-white hover:bg-sand-50 border border-sand-200 text-sand-800 px-2 py-1.5 rounded-lg shrink-0"
-                    >
-                      🌿 Log as Experience
-                    </button>
-                  )}
+                  <button
+                    onClick={() => tryNextYear(wish)}
+                    className="text-[10px] bg-white hover:bg-sand-50 border border-sand-200 text-sand-800 px-2 py-1.5 rounded-lg shrink-0"
+                  >
+                    🌱 Try next year
+                  </button>
+                  <button onClick={() => undoMissed(wish)} className="text-sand-800/50 hover:text-sand-900 text-[11px] px-1 shrink-0">
+                    Undo
+                  </button>
                   <button onClick={() => setConfirmDeleteId(wish.id)} className="text-sand-800/50 hover:text-terracotta-600 text-[11px] px-1 shrink-0">
                     Delete
                   </button>
@@ -189,6 +228,24 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
               showToast('Updated');
             }
             setEditing('closed');
+          }}
+        />
+      )}
+
+      {storyFor && (
+        <AchievedStoryModal
+          wish={storyFor.wish}
+          mode={storyFor.mode}
+          onClose={() => setStoryFor(null)}
+          onDone={(message) => {
+            const id = storyFor.wish.id;
+            const wasCompleting = storyFor.mode === 'complete';
+            setStoryFor(null);
+            showToast(message);
+            if (wasCompleting) {
+              setJustCompletedId(id);
+              setTimeout(() => setJustCompletedId((current) => (current === id ? null : current)), 2000);
+            }
           }}
         />
       )}

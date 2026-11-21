@@ -259,8 +259,15 @@ export interface WishItem extends LifeItemBase {
   year?: number;
   done?: boolean;
   dateCompleted?: string;
+  /** Can't happen this time (e.g. a festival that has passed) — kept, but out of the open list. */
+  missed?: boolean;
+  dateMissed?: string;
   /** Set when a completed wish is turned into an Experience entry. */
   linkedExperienceId?: string;
+  /** The story of how it happened, written when it was ticked off. */
+  story?: string;
+  /** Set when that story was also saved as a journal entry. */
+  linkedJournalId?: string;
 }
 
 export type LifeItem = BookItem | MovieItem | SeriesItem | ArtworkItem | ExperienceItem | WishItem;

@@ -526,7 +526,7 @@ const journalRhythm: Rule = (d) => {
 /** This year's vision — progress and gentle reminders. */
 const annualVision: Rule = (d) => {
   const year = Number(d.today.slice(0, 4));
-  const vision = d.life.filter((i): i is WishItem => i.type === 'wish' && i.listType === 'annualVision' && (i.year ?? year) === year);
+  const vision = d.life.filter((i): i is WishItem => i.type === 'wish' && i.listType === 'annualVision' && (i.year ?? year) === year && !i.missed);
   if (vision.length === 0) return null;
   const done = vision.filter((v) => v.done);
   const open = vision.filter((v) => !v.done);
@@ -604,7 +604,7 @@ const words = (text: string) => ` ${text.toLowerCase().replace(/[^a-z0-9 ]+/g, '
 function relatedDream(subject: SubjectItem, life: LifeItem[]): WishItem | undefined {
   const key = subject.title.toLowerCase();
   const vocab = new Set([key, ...(RELATED_WORDS[key] ?? []), ...(subject.goal ? subject.goal.toLowerCase().split(/\s+/).filter((w) => w.length > 3) : [])]);
-  const wishes = life.filter((i): i is WishItem => i.type === 'wish' && !i.done);
+  const wishes = life.filter((i): i is WishItem => i.type === 'wish' && !i.done && !i.missed);
   // Annual Vision first — it's this year's intention.
   wishes.sort((a, b) => (a.listType === 'annualVision' ? -1 : 0) - (b.listType === 'annualVision' ? -1 : 0));
   return wishes.find((w) => {
