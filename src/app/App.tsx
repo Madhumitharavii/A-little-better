@@ -16,6 +16,7 @@ import WeekPage from '@/features/week/WeekPage';
 import { checkReminders } from '@/shared/utils/reminders';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { runSync } from '@/lib/sync/syncEngine';
+import { mergeDuplicateSubjects } from '@/db/repositories/studyRepository';
 import { subscribePasswordRecovery } from '@/lib/sync/authService';
 import { applyTheme, onSystemThemeChange } from '@/shared/utils/theme';
 import { onOpenLifeItem } from './navigation';
@@ -98,7 +99,8 @@ export default function App() {
       const now = Date.now();
       if (now - lastAttempt < MIN_INTERVAL_MS) return;
       lastAttempt = now;
-      void runSync();
+      // After each sync, merge any subjects that ended up doubled (added on two devices before syncing).
+      void runSync().finally(() => void mergeDuplicateSubjects());
     };
 
     attemptSync(); // initial sync shortly after startup

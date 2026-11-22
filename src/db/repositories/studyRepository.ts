@@ -152,3 +152,61 @@ export async function addStarterSubjects(): Promise<void> {
     if (!existing.has(starter.title.toLowerCase())) await createSubject(starter, new Date(base + i).toISOString());
   }
 }
+
+// ── duplicates ──
+
+const TOPIC_RANK: Record<StudyTopic['status'], number> = { notStarted: 0, learning: 1, confident: 2 };
+
+/**
+ * Merges subjects with the same name (e.g. the starter subjects added on
+ * both phone and Mac before they synced). The OLDEST copy is kept — every
+ * device picks the same one — and gets the other copies' topics (matched
+ * by name, keeping the furthest progress), goals and study sessions.
+ * The extra copies are marked deleted, which syncs like any delete.
+ * Returns how many duplicates were merged.
+ */
+export async function mergeDuplicateSubjects(): Promise<number> {
+  const rows = await table().toArray();
+  const subjects = selectSubjects(rows);
+  const sessions = selectStudySessions(rows);
+  const groups = new Map<string, SubjectItem[]>();
+  for (const s of subjects) {
+    const key = s.title.trim().toLowerCase();
+    groups.set(key, [...(groups.get(key) ?? []), s]);
+  }
+
+  const now = nowIso();
+  const writes: (SubjectItem | StudySessionItem)[] = [];
+  let merged = 0;
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const [keep, ...extras] = [...group].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)) || a.id.localeCompare(b.id));
+    const topics = keep.topics.map((t) => ({ ...t }));
+    const kept: SubjectItem = { ...keep, topics };
+    for (const extra of extras) {
+      const topicMap = new Map<string, string>();
+      for (const t of extra.topics ?? []) {
+        const same = topics.find((k) => k.name.trim().toLowerCase() === t.name.trim().toLowerCase());
+        if (same) {
+          topicMap.set(t.id, same.id);
+          if (TOPIC_RANK[t.status] > TOPIC_RANK[same.status]) same.status = t.status;
+        } else {
+          topics.push({ ...t });
+          topicMap.set(t.id, t.id);
+        }
+      }
+      kept.weeklyGoal ??= extra.weeklyGoal;
+      kept.goal ??= extra.goal;
+      kept.goalDate ??= extra.goalDate;
+      kept.icon ??= extra.icon;
+      for (const s of sessions.filter((x) => x.subjectId === extra.id)) {
+        writes.push({ ...s, subjectId: keep.id, topicId: s.topicId ? topicMap.get(s.topicId) ?? s.topicId : undefined, updatedAt: now });
+      }
+      writes.push({ ...extra, deletedAt: now, updatedAt: now });
+      merged++;
+    }
+    writes.push({ ...kept, updatedAt: now });
+  }
+  if (writes.length) await table().bulkPut(writes);
+  return merged;
+}

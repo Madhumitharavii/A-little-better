@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getLifeItem } from '@/db/repositories/lifeRepository';
+import { useLifeRows } from '@/db/lifeStore';
 import type { LifeItem, WishItem } from '@/db/schema';
 import { useRecentlyAdded, useLifeCounts, useLifeSearch, useLifeItemsOfType } from './useLifeItems';
 import LifeSearchBar from './LifeSearchBar';
@@ -32,6 +33,7 @@ export default function LifePage({ showToast, openItemId, onOpenedItem }: LifePa
   const [view, setView] = useState<LifeView>('home');
   const [openItem, setOpenItem] = useState<LifeItem | null>(null);
   const [query, setQuery] = useState('');
+  const lifeLoaded = useLifeRows() !== undefined;
 
   useEffect(() => {
     if (!openItemId) return;
@@ -123,7 +125,7 @@ export default function LifePage({ showToast, openItemId, onOpenedItem }: LifePa
                     <p className="serif text-lg font-semibold text-sand-900">{cat.title}</p>
                     <p className="text-[11px] text-sand-800/60 mt-0.5">{cat.tagline}</p>
                     <p className="text-[11px] text-sand-800/50 mt-2">
-                      {cat.count} {cat.count === 1 ? 'entry' : 'entries'}
+                      {!lifeLoaded ? 'Loading…' : `${cat.count.toLocaleString()} ${cat.count === 1 ? 'entry' : 'entries'}`}
                     </p>
                   </button>
                 ))}

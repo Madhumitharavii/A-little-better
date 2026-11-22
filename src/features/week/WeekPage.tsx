@@ -1,3 +1,4 @@
+import { useLifeRows } from '@/db/lifeStore';
 import { useWeekData } from './useWeekData';
 import { deriveLittleThings } from './littleThings';
 import { usePeriodEntries } from '@/features/me/period/usePeriodEntries';
@@ -91,9 +92,24 @@ export default function WeekPage({ showToast }: { showToast: (msg: string) => vo
   const week = useWeekData(today);
   const { stats: cycleStats } = usePeriodEntries();
   const littleThings = deriveLittleThings(week);
+  const lifeLoaded = useLifeRows() !== undefined;
 
   if (openSubjectId) {
     return <SubjectPage subjectId={openSubjectId} onBack={() => setOpenSubjectId(null)} showToast={showToast} />;
+  }
+
+  // Your library is still being read from storage (a moment, with thousands of items) — say so,
+  // rather than showing an empty week that looks like data is missing.
+  if (!lifeLoaded) {
+    return (
+      <div className="space-y-6">
+        <section className="text-center sm:text-left">
+          <h2 className="serif text-2xl sm:text-3xl font-semibold text-sand-900">This Week</h2>
+          <p className="text-sm text-sand-800/70 mt-1 italic font-serif">A gentle look back, not a scorecard.</p>
+        </section>
+        <p className="text-sm text-sand-800/60 animate-pulse py-10 text-center">Loading your week…</p>
+      </div>
+    );
   }
 
   return (
