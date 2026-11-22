@@ -41,11 +41,17 @@ function rawSortKey(item: LifeItem): unknown {
   }
 }
 
+/** Pure: Life items (optionally of one type) from all rows, newest first. */
+export function selectLifeItems(all: readonly { type: string; deletedAt?: string | null }[], type?: LifeItemType): LifeItem[] {
+  return all
+    .filter((item): item is LifeItem => isLifeItem(item) && (!type || item.type === type))
+    .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+}
+
 export async function getLifeItems(type?: LifeItemType): Promise<LifeItem[]> {
-  // A full read + filter rather than the `type` index: it's just as fast at this size, and it can't
-  // come back empty if a device's index ever disagrees with its rows (which hid Annual Vision once).
-  const all = await db.lifeItems.toArray();
-  return all.filter((item) => isLifeItem(item) && (!type || item.type === type)).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+  // A full read + filter rather than the `type` index, so it can't come back empty if a
+  // device's index ever disagrees with its rows. (Screens use the shared copy in lifeStore.ts.)
+  return selectLifeItems(await db.lifeItems.toArray(), type);
 }
 
 export async function getLifeItem(id: string): Promise<LifeItem | undefined> {
@@ -185,19 +191,25 @@ function itemSearchText(item: LifeItem): string {
 }
 
 /** Simple local, case-insensitive substring search across all LIFE categories. */
-export async function searchLifeItems(query: string): Promise<LifeItem[]> {
+export function selectSearch(all: readonly { type: string; deletedAt?: string | null }[], query: string): LifeItem[] {
   const trimmed = query.trim().toLowerCase();
   if (!trimmed) return [];
-  const all = await db.lifeItems.toArray();
-  return all.filter((item) => isLifeItem(item) && itemSearchText(item).includes(trimmed));
+  return all.filter((item): item is LifeItem => isLifeItem(item) && itemSearchText(item).includes(trimmed));
+}
+
+export async function searchLifeItems(query: string): Promise<LifeItem[]> {
+  return selectSearch(await db.lifeItems.toArray(), query);
+}
+
+export function selectRecentlyAdded(all: readonly { type: string; deletedAt?: string | null }[], limit = 6): LifeItem[] {
+  return all
+    .filter((item): item is LifeItem => isLifeItem(item) && !isWishlistItem(item))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, limit);
 }
 
 export async function getRecentlyAdded(limit = 6): Promise<LifeItem[]> {
-  const all = await db.lifeItems.toArray();
-  return all
-    .filter((item) => isLifeItem(item) && !isWishlistItem(item))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, limit);
+  return selectRecentlyAdded(await db.lifeItems.toArray(), limit);
 }
 
 export interface LifeCounts {
@@ -209,12 +221,15 @@ export interface LifeCounts {
   wish: number;
 }
 
-export async function getLifeCounts(): Promise<LifeCounts> {
-  const all = await db.lifeItems.toArray();
+export function selectLifeCounts(all: readonly { type: string; deletedAt?: string | null }[]): LifeCounts {
   const counts: LifeCounts = { book: 0, movie: 0, series: 0, artwork: 0, experience: 0, wish: 0 };
   for (const item of all) {
     if (!isLifeItem(item) || isWishlistItem(item)) continue;
     counts[item.type]++;
   }
   return counts;
+}
+
+export async function getLifeCounts(): Promise<LifeCounts> {
+  return selectLifeCounts(await db.lifeItems.toArray());
 }

@@ -135,9 +135,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen lg:flex">
-      {/* Wide windows (Mac, tablet landscape): navigation in a sidebar on the left. */}
-      <aside className="hidden lg:flex flex-col w-60 shrink-0 h-screen sticky top-0 border-r border-sand-200 px-5 py-7 gap-7">
+    <div className="min-h-screen md:flex">
+      {/* Wider windows (Mac, tablets): navigation in a sidebar on the left. */}
+      <aside className="hidden md:flex flex-col w-52 lg:w-60 shrink-0 h-screen sticky top-0 border-r border-sand-200 px-4 lg:px-5 py-7 gap-7">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 shrink-0 rounded-2xl bg-terracotta-400/10 flex items-center justify-center text-xl">🍃</div>
           <div className="min-w-0">
@@ -189,9 +189,9 @@ export default function App() {
       </aside>
 
       <div className="flex-1 min-w-0">
-    <div className="max-w-3xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-6 lg:pt-10 pb-16">
+    <div className="max-w-3xl md:max-w-6xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 pt-6 md:pt-10 pb-16">
       {/* Phones and narrow windows: the header with tabs on top. */}
-      <header className="pb-6 border-b border-sand-200 lg:hidden">
+      <header className="pb-6 border-b border-sand-200 md:hidden">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-terracotta-400/10 flex items-center justify-center text-terracotta-600 text-xl font-bold">
@@ -271,7 +271,7 @@ export default function App() {
 
       <Toast message={toastMessage} />
 
-      <main className="mt-8 lg:mt-0">
+      <main className="mt-8 md:mt-0">
         {currentTab === 'today' && <TodayPage showToast={showToast} soundEnabled={!!settings?.soundEnabled} />}
         {currentTab === 'week' && <WeekPage showToast={showToast} />}
         {currentTab === 'life' && <LifePage showToast={showToast} openItemId={lifeItemToOpen} onOpenedItem={() => setLifeItemToOpen(null)} />}

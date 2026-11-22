@@ -1,4 +1,5 @@
-import { liveQuery, type Table } from 'dexie';
+import type { Table } from 'dexie';
+import { getLifeRows, subscribeLifeRows } from '../lifeStore';
 import { db } from '../db';
 import { generateId, nowIso } from '../id';
 import type { SyncedPrefItem } from '../schema';
@@ -36,14 +37,19 @@ export async function writePref(key: PrefKey, value: unknown): Promise<void> {
 /** Calls back when a newer value arrives (from another device, via sync). Returns an unsubscribe function. */
 export function watchPref<T>(key: PrefKey, onChange: (value: T) => void): () => void {
   let last: string | undefined;
-  const sub = liveQuery(() => newest(key)).subscribe({
-    next: (row) => {
-      if (!row || row.updatedAt === last) return;
-      last = row.updatedAt;
-      if (ownWrites.get(key) === row.updatedAt) return;
-      onChange(row.value as T);
-    },
-    error: () => undefined,
-  });
-  return () => sub.unsubscribe();
+  const check = () => {
+    const rows = getLifeRows();
+    if (!rows) return;
+    let row: SyncedPrefItem | undefined;
+    for (const r of rows as unknown as SyncedPrefItem[]) {
+      if (r.type === 'pref' && r.key === key && !r.deletedAt && (!row || r.updatedAt > row.updatedAt)) row = r;
+    }
+    if (!row || row.updatedAt === last) return;
+    last = row.updatedAt;
+    if (ownWrites.get(key) === row.updatedAt) return;
+    onChange(row.value as T);
+  };
+  const stop = subscribeLifeRows(check);
+  check();
+  return stop;
 }

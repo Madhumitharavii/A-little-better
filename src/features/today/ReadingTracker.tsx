@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import type { BookItem, CareEntry, WishItem } from '@/db/schema';
-import { getLifeItems, updateLifeItem } from '@/db/repositories/lifeRepository';
+import { updateLifeItem } from '@/db/repositories/lifeRepository';
+import { useLifeItemsOfType } from '@/features/life/useLifeItems';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { booksFinishedIn, readingGoalTarget } from '@/features/life/wishlist/visionList';
 import { shuffle } from '@/features/toolbox/boredIdeas';
@@ -23,8 +23,8 @@ interface ReadingTrackerProps {
 export default function ReadingTracker({ entry, onAddMinutes, onToggleDone, showToast }: ReadingTrackerProps) {
   const isDone = entry?.status === 'done';
   const minutes = entry?.valueMinutes ?? 0;
-  const books = (useLiveQuery(() => getLifeItems('book'), []) ?? []) as BookItem[];
-  const wishes = (useLiveQuery(() => getLifeItems('wish'), []) ?? []) as WishItem[];
+  const books = useLifeItemsOfType('book') as BookItem[];
+  const wishes = useLifeItemsOfType('wish') as WishItem[];
 
   const reading = useMemo(
     () => books.filter((b) => b.status === 'inProgress').sort((a, b) => (b.dateStarted ?? b.updatedAt).localeCompare(a.dateStarted ?? a.updatedAt)),

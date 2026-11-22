@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { clearToolEvents, getToolEvents } from '@/db/repositories/toolEventRepository';
+import { clearToolEvents } from '@/db/repositories/toolEventRepository';
+import { useLifeRows } from '@/db/lifeStore';
 import {
   exportAllData,
   downloadBackupFile,
@@ -19,7 +19,7 @@ type PendingImport = { file: BackupFile; validation: BackupValidationResult };
 
 export default function BackupSection({ showToast }: BackupSectionProps) {
   // "I'm bored" / "I'm scrolling" taps — kept only on this device, for Noticed for You.
-  const tapCount = useLiveQuery(async () => (await getToolEvents()).length, []) ?? 0;
+  const tapCount = (useLifeRows() ?? []).filter((r) => r.type === 'toolEvent' && !r.deletedAt).length;
   const [confirmClearTaps, setConfirmClearTaps] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pending, setPending] = useState<PendingImport | null>(null);

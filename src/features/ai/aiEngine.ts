@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useLifeRows } from '@/db/lifeStore';
 import { db } from '@/db/db';
 import { getLocalDateKey } from '@/db/dateUtils';
 import type { DailyReflection, JournalEntry, LifeItem, StudySessionItem } from '@/db/schema';
@@ -312,12 +313,24 @@ export async function suggestTags(text: string, currentTags: string[]): Promise<
 export function useAiBackground(): void {
   const enabled = useAiEnabled();
   // A cheap signature of all writing — changes whenever an entry is added, edited or removed.
-  const signature = useLiveQuery(async () => {
+  const stamp = (rows: readonly object[]) => {
+    let max = '';
+    for (const x of rows as { updatedAt?: unknown }[]) if (typeof x.updatedAt === "string" && x.updatedAt > max) max = x.updatedAt;
+    return max;
+  };
+  const writing = useLiveQuery(async () => {
     if (!enabled) return '';
-    const [j, r, l] = await Promise.all([db.journalEntries.toArray(), db.dailyReflections.toArray(), db.lifeItems.toArray()]);
-    const stamp = (rows: { id: string; updatedAt: string }[]) => rows.map((x) => x.updatedAt).sort().pop() ?? '';
-    return `${j.length}:${stamp(j)}|${r.length}:${stamp(r)}|${l.length}:${stamp(l as unknown as { id: string; updatedAt: string }[])}`;
+    const [j, r] = await Promise.all([db.journalEntries.toArray(), db.dailyReflections.toArray()]);
+    return `${j.length}:${stamp(j)}|${r.length}:${stamp(r)}`;
   }, [enabled]);
+  // Life rows from the shared copy — ignoring taps and synced preferences, which aren't writing.
+  const lifeRows = useLifeRows();
+  const lifeStamp = useMemo(() => {
+    if (!enabled || !lifeRows) return '';
+    const relevant = lifeRows.filter((x) => x.type !== 'toolEvent' && x.type !== 'pref');
+    return `${relevant.length}:${stamp(relevant)}`;
+  }, [enabled, lifeRows]);
+  const signature = writing === undefined || lifeRows === undefined ? undefined : `${writing}|${lifeStamp}`;
 
   useEffect(() => {
     if (!enabled) return;

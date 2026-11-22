@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import Modal, { ModalHeader } from '@/shared/components/Modal';
-import { db } from '@/db/db';
+import { useLifeRows } from '@/db/lifeStore';
 import type { BookItem, LifeItem, MovieItem } from '@/db/schema';
 import { openLifeItem } from '@/app/navigation';
 import { startableByMeaning, useAiEnabled, useAiState } from '@/features/ai/aiEngine';
@@ -36,7 +35,7 @@ const gistUrl = (item: LifeItem) => {
  * shows once before any repeats. A pure redirect — nothing is saved.
  */
 export default function BoredTool({ onClose, showToast }: ReflectionToolProps) {
-  const life = useLiveQuery(() => db.lifeItems.toArray(), []);
+  const life = useLifeRows<LifeItem>();
   const aiOn = useAiEnabled();
   const ai = useAiState();
   const year = new Date().getFullYear();

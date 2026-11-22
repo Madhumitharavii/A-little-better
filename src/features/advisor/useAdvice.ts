@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/db';
+import { useLifeRows } from '@/db/lifeStore';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { allInsights, type AdvisorData, type Insight } from './rules';
 import { allSeen, chooseToday, dismissRule, loadHistory, markSeen, saveHistory, subscribeHistory, subscribeSeen } from './select';
@@ -8,14 +9,20 @@ import { useAiEnabled, useAiState } from '@/features/ai/aiEngine';
 
 /** Everything the advisor reads — straight from the local database. */
 function useAdvisorData(): AdvisorData | undefined {
-  return useLiveQuery(async () => {
-    const [care, journal, reflections, life, people] = await Promise.all([
+  const others = useLiveQuery(async () => {
+    const [care, journal, reflections, people] = await Promise.all([
       db.careEntries.toArray(),
       db.journalEntries.toArray(),
       db.dailyReflections.toArray(),
-      db.lifeItems.toArray(),
       db.people.toArray(),
     ]);
+    return { care, journal, reflections, people };
+  }, []);
+  // Life rows come from the one shared copy of the table (lifeStore.ts).
+  const life = useLifeRows();
+  return useMemo(() => {
+    if (!others || !life) return undefined;
+    const { care, journal, reflections, people } = others;
     // The lifeItems table also holds study rows, "I'm bored" taps and synced preferences — split them out.
     const rows = life.filter((i) => !i.deletedAt) as unknown as Array<{ type: string }>;
     return {
@@ -29,7 +36,7 @@ function useAdvisorData(): AdvisorData | undefined {
       subjects: rows.filter((i) => i.type === 'subject') as unknown as AdvisorData['subjects'],
       studySessions: rows.filter((i) => i.type === 'studySession') as unknown as AdvisorData['studySessions'],
     };
-  }, []);
+  }, [others, life]);
 }
 
 /**

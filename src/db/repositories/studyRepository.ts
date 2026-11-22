@@ -12,14 +12,22 @@ import type { LifeItem, StudySessionItem, StudyTopic, SubjectItem, TopicStatus }
 // The table is typed for Life items; study rows share it, so cast at this one boundary.
 const table = () => db.lifeItems as unknown as import('dexie').Table<SubjectItem | StudySessionItem, string>;
 
+export function selectSubjects(all: readonly { type: string; deletedAt?: string | null }[]): SubjectItem[] {
+  return (all.filter((r) => r.type === 'subject' && !r.deletedAt) as unknown as SubjectItem[]).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+
+export function selectStudySessions(all: readonly { type: string; deletedAt?: string | null }[]): StudySessionItem[] {
+  return (all.filter((r) => r.type === 'studySession' && !r.deletedAt) as unknown as StudySessionItem[]).sort(
+    (a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)),
+  );
+}
+
 export async function getSubjects(): Promise<SubjectItem[]> {
-  const rows = (await table().toArray()).filter((r) => r.type === 'subject');
-  return (rows as SubjectItem[]).filter((s) => !s.deletedAt).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  return selectSubjects(await table().toArray());
 }
 
 export async function getStudySessions(): Promise<StudySessionItem[]> {
-  const rows = (await table().toArray()).filter((r) => r.type === 'studySession');
-  return (rows as StudySessionItem[]).filter((s) => !s.deletedAt).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)));
+  return selectStudySessions(await table().toArray());
 }
 
 export async function createSubject(input: { title: string; icon?: string; goal?: string; goalDate?: string; topicNames?: string[] }, createdAt?: string): Promise<SubjectItem> {

@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getAllCareEntries } from '@/db/repositories/careRepository';
 import { getJournalEntries } from '@/db/repositories/journalRepository';
-import { getLifeItems } from '@/db/repositories/lifeRepository';
+import { useLifeItemsOfType } from '@/features/life/useLifeItems';
 import { lifeItemActivityDates } from '@/db/lifeDates';
 import { getLocalDateKey, addDays } from '@/db/dateUtils';
 import type { CareEntry, JournalEntry, LifeItem } from '@/db/schema';
@@ -29,11 +29,11 @@ function lifeItemDateInWeek(item: LifeItem, weekDates: Set<string>): boolean {
 export function useWeekData(today: string = getLocalDateKey()): WeekData {
   const careEntries = useLiveQuery(() => getAllCareEntries(), []) ?? [];
   const journalEntries = useLiveQuery(() => getJournalEntries(), []) ?? [];
-  const books = (useLiveQuery(() => getLifeItems('book'), []) ?? []) as LifeItem[];
-  const movies = (useLiveQuery(() => getLifeItems('movie'), []) ?? []) as LifeItem[];
-  const series = (useLiveQuery(() => getLifeItems('series'), []) ?? []) as LifeItem[];
-  const artwork = (useLiveQuery(() => getLifeItems('artwork'), []) ?? []) as LifeItem[];
-  const experiences = (useLiveQuery(() => getLifeItems('experience'), []) ?? []) as LifeItem[];
+  const books = useLifeItemsOfType('book') as LifeItem[];
+  const movies = useLifeItemsOfType('movie') as LifeItem[];
+  const series = useLifeItemsOfType('series') as LifeItem[];
+  const artwork = useLifeItemsOfType('artwork') as LifeItem[];
+  const experiences = useLifeItemsOfType('experience') as LifeItem[];
 
   const weekDateKeys: string[] = [];
   for (let i = 6; i >= 0; i--) weekDateKeys.push(addDays(today, -i));

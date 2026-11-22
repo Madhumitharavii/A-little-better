@@ -1,14 +1,17 @@
-import { useLiveQuery } from 'dexie-react-hooks';
-import { getStudySessions, getSubjects } from '@/db/repositories/studyRepository';
+import { useMemo } from 'react';
+import { selectStudySessions, selectSubjects } from '@/db/repositories/studyRepository';
+import { useLifeRows } from '@/db/lifeStore';
 import { getLocalDateKey } from '@/db/dateUtils';
 import type { StudySessionItem } from '@/db/schema';
 
 export function useSubjects() {
-  return useLiveQuery(() => getSubjects(), []);
+  const rows = useLifeRows();
+  return useMemo(() => (rows ? selectSubjects(rows) : undefined), [rows]);
 }
 
 export function useStudySessions() {
-  return useLiveQuery(() => getStudySessions(), []) ?? [];
+  const rows = useLifeRows();
+  return useMemo(() => (rows ? selectStudySessions(rows) : []), [rows]);
 }
 
 const dayNum = (key: string) => Date.parse(`${key}T00:00:00Z`) / 86_400_000;
