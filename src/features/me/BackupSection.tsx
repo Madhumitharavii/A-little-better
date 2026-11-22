@@ -1,4 +1,7 @@
 import { useRef, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db/db';
+import { clearToolEvents } from '@/db/repositories/toolEventRepository';
 import {
   exportAllData,
   downloadBackupFile,
@@ -16,6 +19,9 @@ interface BackupSectionProps {
 type PendingImport = { file: BackupFile; validation: BackupValidationResult };
 
 export default function BackupSection({ showToast }: BackupSectionProps) {
+  // "I'm bored" / "I'm scrolling" taps — kept only on this device, for Noticed for You.
+  const tapCount = useLiveQuery(() => db.toolEvents.count(), []) ?? 0;
+  const [confirmClearTaps, setConfirmClearTaps] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pending, setPending] = useState<PendingImport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +81,43 @@ export default function BackupSection({ showToast }: BackupSectionProps) {
           Import from File
           <input ref={fileInputRef} type="file" accept="application/json" onChange={handleFileChosen} className="hidden" />
         </label>
+      </div>
+
+      <div className="pt-2 border-t border-amber-300/40 space-y-2">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-sand-900">"I'm bored" &amp; "I'm scrolling" taps</p>
+            <p className="text-[11px] text-sand-800/60">
+              {tapCount === 0 ? 'None saved.' : `${tapCount} saved on this device only (never synced). Noticed for You uses them to spot patterns.`}
+            </p>
+          </div>
+          {tapCount > 0 && !confirmClearTaps && (
+            <button
+              onClick={() => setConfirmClearTaps(true)}
+              className="shrink-0 px-3 py-2 bg-sand-200 hover:bg-sand-300 text-sand-900 rounded-xl font-semibold text-xs"
+            >
+              Clear taps
+            </button>
+          )}
+        </div>
+        {confirmClearTaps && (
+          <div className="flex items-center gap-2 text-xs">
+            <p className="flex-1 text-sand-800/80">Forget all {tapCount} taps? Your journal, care and everything else stay.</p>
+            <button
+              onClick={async () => {
+                const n = await clearToolEvents();
+                setConfirmClearTaps(false);
+                showToast(`Forgot ${n} tap${n === 1 ? '' : 's'} 🧹`);
+              }}
+              className="px-3 py-2 bg-terracotta-400 hover:bg-terracotta-600 text-white rounded-xl font-semibold"
+            >
+              Clear
+            </button>
+            <button onClick={() => setConfirmClearTaps(false)} className="px-3 py-2 bg-sand-100 hover:bg-sand-200 text-sand-900 rounded-xl font-semibold">
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <p className="text-[11px] text-terracotta-600 bg-terracotta-100 px-3 py-2 rounded-xl">{error}</p>}
