@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import feedHandler from './api/feed';
 
 // A Little Better — local-first PWA build config.
 // No network calls are required for the app to function. Runtime caching
@@ -15,6 +16,18 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    // In local development, answer /api/feed with the same relay Vercel runs in production.
+    {
+      name: 'dev-feed-relay',
+      configureServer(server) {
+        server.middlewares.use('/api/feed', async (req, res) => {
+          const response = await feedHandler(new Request(`http://localhost${req.originalUrl ?? req.url}`));
+          res.statusCode = response.status;
+          response.headers.forEach((v, k) => res.setHeader(k, v));
+          res.end(await response.text());
+        });
+      },
+    },
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png'],

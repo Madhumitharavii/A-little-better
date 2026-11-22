@@ -34,7 +34,7 @@ export interface ParsedGoodreadsRow {
   shelves: string[];
 }
 
-function normalizeDate(raw: string | undefined): string | undefined {
+export function normalizeDate(raw: string | undefined): string | undefined {
   const trimmed = raw?.trim();
   if (!trimmed) return undefined;
   if (/^\d{4}\/\d{2}\/\d{2}$/.test(trimmed)) return trimmed.replace(/\//g, '-');

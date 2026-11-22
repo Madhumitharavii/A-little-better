@@ -1,3 +1,4 @@
+import ConnectedAccountsSection from './ConnectedAccountsSection';
 import SettingsSection from '@/features/me/SettingsSection';
 import AccountSection from '@/features/me/AccountSection';
 import BackupSection from '@/features/me/BackupSection';
@@ -33,6 +34,7 @@ export default function SettingsPage({ showToast, onBack }: SettingsPageProps) {
         <div className="space-y-4">
           <SettingsSection />
           <OnDeviceAiSection />
+          <ConnectedAccountsSection showToast={showToast} />
           <AccountSection showToast={showToast} />
           <BackupSection showToast={showToast} />
         </div>

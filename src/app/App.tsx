@@ -20,6 +20,7 @@ import { mergeDuplicateSubjects } from '@/db/repositories/studyRepository';
 import { subscribePasswordRecovery } from '@/lib/sync/authService';
 import { applyTheme, onSystemThemeChange } from '@/shared/utils/theme';
 import { onOpenLifeItem } from './navigation';
+import type { FeedSyncResult } from '@/lib/feedSync';
 import { useMediaQuery } from '@/shared/hooks/useMediaQuery';
 
 
@@ -31,6 +32,18 @@ export default function App() {
   const { toastMessage, showToast } = useToast();
   // A Life item another screen asked to open (e.g. a film picked by "I'm bored").
   const [lifeItemToOpen, setLifeItemToOpen] = useState<string | null>(null);
+  // A gentle note when your Letterboxd / Goodreads feeds bring something new.
+  useEffect(() => {
+    const onFeeds = (e: Event) => {
+      const r = (e as CustomEvent<FeedSyncResult>).detail;
+      const films = r.letterboxd && 'added' in r.letterboxd ? r.letterboxd.added : 0;
+      const books = r.goodreads && 'added' in r.goodreads ? r.goodreads.added : 0;
+      const parts = [films && `${films} film${films === 1 ? '' : 's'} from Letterboxd`, books && `${books} book${books === 1 ? '' : 's'} from Goodreads`].filter(Boolean);
+      if (parts.length) showToast(`Added ${parts.join(' and ')} 🎬📚`);
+    };
+    window.addEventListener('alb:feeds-synced', onFeeds);
+    return () => window.removeEventListener('alb:feeds-synced', onFeeds);
+  }, [showToast]);
   useEffect(
     () =>
       onOpenLifeItem((id) => {

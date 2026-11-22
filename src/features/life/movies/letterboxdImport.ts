@@ -287,7 +287,7 @@ export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm): L
     rewatch: combined.length > 1 || existing.rewatch || f.watches.some((w) => w.rewatch) || undefined,
     favorite: existing.favorite || f.liked || undefined,
     lists: lists.length ? lists : undefined,
-    letterboxdUri: f.uri ?? existing.letterboxdUri,
+    letterboxdUri: existing.letterboxdUri ?? f.uri, // keep the link a film already has (feed and export use different link styles)
     tags: existing.tags?.length ? existing.tags : f.tags.length ? f.tags : undefined,
   };
   const before = {

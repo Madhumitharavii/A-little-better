@@ -179,6 +179,7 @@ supabase/                SQL migrations and sync documentation
 - **On-device AI:** Transformers.js, ONNX Runtime Web (WebAssembly), all-MiniLM-L6-v2
 - **Testing:** Vitest with fake-indexeddb
 - **Imports:** Goodreads CSV, the whole unzipped Letterboxd export folder, and Flo's JSON export (or any cycle CSV)
+- **Connected accounts:** keep logging on Letterboxd and Goodreads — new films and books (ratings, reviews, likes, shelves) arrive automatically from your public RSS feeds, through a tiny relay on the app's own Vercel project (`api/feed.ts`, which can only fetch those two feed addresses). One way only; merged with the same rules as the imports, so nothing is duplicated.
 
 ## Testing
 
