@@ -18,6 +18,7 @@ import { getLocalDateKey } from '@/db/dateUtils';
 import { runSync } from '@/lib/sync/syncEngine';
 import { subscribePasswordRecovery } from '@/lib/sync/authService';
 import { applyTheme, onSystemThemeChange } from '@/shared/utils/theme';
+import { onOpenLifeItem } from './navigation';
 
 
 export default function App() {
@@ -26,6 +27,16 @@ export default function App() {
   // Where ← Back on Settings returns to.
   const [lastTab, setLastTab] = useState<TabId>('today');
   const { toastMessage, showToast } = useToast();
+  // A Life item another screen asked to open (e.g. a film picked by "I'm bored").
+  const [lifeItemToOpen, setLifeItemToOpen] = useState<string | null>(null);
+  useEffect(
+    () =>
+      onOpenLifeItem((id) => {
+        setLifeItemToOpen(id);
+        setCurrentTab('life');
+      }),
+    [],
+  );
 
   const settings = useLiveQuery(() => getSettings(), []);
 
@@ -203,7 +214,7 @@ export default function App() {
       <main className="mt-8">
         {currentTab === 'today' && <TodayPage showToast={showToast} soundEnabled={!!settings?.soundEnabled} />}
         {currentTab === 'week' && <WeekPage showToast={showToast} />}
-        {currentTab === 'life' && <LifePage showToast={showToast} />}
+        {currentTab === 'life' && <LifePage showToast={showToast} openItemId={lifeItemToOpen} onOpenedItem={() => setLifeItemToOpen(null)} />}
         {currentTab === 'journal' && <JournalPage showToast={showToast} />}
         {currentTab === 'me' && <MePage showToast={showToast} />}
         {currentTab === 'settings' && <SettingsPage showToast={showToast} onBack={() => setCurrentTab(lastTab)} />}

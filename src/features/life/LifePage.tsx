@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { getLifeItem } from '@/db/repositories/lifeRepository';
 import type { LifeItem, WishItem } from '@/db/schema';
 import { useRecentlyAdded, useLifeCounts, useLifeSearch, useLifeItemsOfType } from './useLifeItems';
 import LifeSearchBar from './LifeSearchBar';
@@ -13,6 +14,9 @@ import AnnualVisionPage from './wishlist/AnnualVisionPage';
 
 interface LifePageProps {
   showToast: (msg: string) => void;
+  /** Open this item straight away (asked for by another screen). */
+  openItemId?: string | null;
+  onOpenedItem?: () => void;
 }
 
 type LifeView = 'home' | 'book' | 'movie' | 'series' | 'artwork' | 'experience' | 'somedayMaybe' | 'annualVision';
@@ -24,10 +28,21 @@ function viewForItem(item: LifeItem): Exclude<LifeView, 'home'> {
   return item.type;
 }
 
-export default function LifePage({ showToast }: LifePageProps) {
+export default function LifePage({ showToast, openItemId, onOpenedItem }: LifePageProps) {
   const [view, setView] = useState<LifeView>('home');
   const [openItem, setOpenItem] = useState<LifeItem | null>(null);
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (!openItemId) return;
+    void getLifeItem(openItemId).then((item) => {
+      if (item && !item.deletedAt) {
+        setView(viewForItem(item));
+        setOpenItem(item);
+      }
+      onOpenedItem?.();
+    });
+  }, [openItemId, onOpenedItem]);
 
   const recentlyAdded = useRecentlyAdded(6);
   const counts = useLifeCounts();

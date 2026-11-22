@@ -90,3 +90,17 @@ describe('on-device model', () => {
     expect(await top('Walked by the lake at sunset')).toBe('nature');
   });
 });
+
+describe('"could I start this today?" (I\'m bored ideas)', () => {
+  it('separates goals you can begin now from ones needing a date or a plan', async () => {
+    const { STARTABLE_EXAMPLES, LATER_EXAMPLES, STARTABLE_MARGIN } = await import('@/features/ai/aiEngine');
+    const [now, later] = [await embed(STARTABLE_EXAMPLES), await embed(LATER_EXAMPLES)];
+    const startable = async (title: string) => {
+      const [v] = await embed([title]);
+      const sim = (a: number[], b: number[]) => a.reduce((s, x, i) => s + x * b[i], 0);
+      return Math.max(...now.map((u) => sim(v, u))) - Math.max(...later.map((u) => sim(v, u))) > STARTABLE_MARGIN;
+    };
+    for (const t of ['Meditate daily', 'Run a 5k', 'Make a scrapbook']) expect(await startable(t), t).toBe(true);
+    for (const t of ['Attend a music festival', 'See the northern lights', 'Get my hair dyed']) expect(await startable(t), t).toBe(false);
+  });
+});

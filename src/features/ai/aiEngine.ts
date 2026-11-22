@@ -7,7 +7,7 @@ import type { Theme } from '@/features/advisor/lexicon';
 import { embed, shutDownModel, subscribeModelStatus, warmUpModel, type ModelStatus } from './embedder';
 import { collectDocuments, textHash, type AiDocument } from './documents';
 import { computeThemes, emotionThemeCounts, emotionsByDoc, emotionTrend, weekSentences, type EmotionWeek, type JournalTheme, type WeekSentence } from './analysis';
-import { classifyEmotionWithHead, mean, normalize, scoreTags, STARTER_TAGS, summarise, THEME_NAMES, topK, type Emotion, type Scored, type SoftmaxModel, type Vector } from './ml';
+import { classifyEmotionWithHead, dot, mean, normalize, scoreTags, STARTER_TAGS, summarise, THEME_NAMES, topK, type Emotion, type Scored, type SoftmaxModel, type Vector } from './ml';
 import emotionHeadJson from './emotionHead.json';
 
 const emotionHead = emotionHeadJson as unknown as SoftmaxModel & { minConfidence: number };
@@ -239,6 +239,44 @@ export async function searchByMeaning(query: string, k = 12): Promise<Scored<AiD
   if (!q || docs.length === 0) return [];
   const [vector] = await embed([q]);
   return topK(vector, docs.map((d, i) => ({ item: d, vector: docVectors[i] })), k, 0.28);
+}
+
+// ── "could I start this today?" (for the I'm-bored ideas) ──
+
+/** Examples of things you can begin right now… */
+export const STARTABLE_EXAMPLES = [
+  'Begin a small habit at home today',
+  'Practise a skill for ten minutes',
+  'Make or create something with my hands',
+  'Do a little exercise this morning',
+  'Work on getting better at something every day',
+];
+/** …and of things that need a date, a place, other people or months of work. */
+export const LATER_EXAMPLES = [
+  'Book a trip to another city',
+  'Go to a festival or celebration on a certain date',
+  'Get an appointment at a salon or studio',
+  'Achieve a big result after months of effort',
+  'Plan an outing with a group of friends',
+];
+/** How much closer to "start now" than to "later" a goal must be — borderline ones aren't suggested. */
+export const STARTABLE_MARGIN = 0.03;
+
+/**
+ * Zero-shot: for each goal, compares its embedding with the nearest
+ * "start now" and nearest "later" example. Only used for goals the
+ * word rules can't classify. Empty when on-device AI is off or not ready.
+ */
+export async function startableByMeaning(titles: string[]): Promise<Map<string, boolean>> {
+  const out = new Map<string, boolean>();
+  if (!titles.length || !state.ready) return out;
+  const [now, later, goals] = await Promise.all([anchorVectors(STARTABLE_EXAMPLES), anchorVectors(LATER_EXAMPLES), anchorVectors(titles)]);
+  titles.forEach((t, i) => {
+    const s = Math.max(...now.map((v) => dot(goals[i], v)));
+    const l = Math.max(...later.map((v) => dot(goals[i], v)));
+    out.set(t, s - l > STARTABLE_MARGIN);
+  });
+  return out;
 }
 
 /**
