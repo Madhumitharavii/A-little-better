@@ -217,13 +217,21 @@ export const isWatched = (f: LetterboxdFilm) => f.watches.length > 0 || f.seen |
 
 type NewMovieInput = Omit<MovieItem, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>;
 
-const toEntry = (w: { date?: string; rating?: number; review?: string }): MovieWatchEntry => ({
+const toEntry = (w: { date?: string; rating?: number; review?: string; fromLetterboxd?: boolean }): MovieWatchEntry => ({
   id: generateId(),
   dateWatched: w.date,
   rating: w.rating,
   review: w.review,
   source: 'letterboxd',
+  reviewFrom: w.review ? (w.fromLetterboxd === false ? 'app' : 'letterboxd') : undefined,
 });
+
+/** Same text apart from spacing / line breaks (Windows vs Unix line endings, extra spaces) — not an edit. */
+const sameWords = (a?: string, b?: string) => (a ?? '').replace(/\s+/g, ' ').trim() === (b ?? '').replace(/\s+/g, ' ').trim();
+
+/** Where an existing review came from (older data has no marker: Letterboxd-imported movies count as Letterboxd). */
+const reviewFromOf = (item: { reviewFrom?: 'letterboxd' | 'app'; source?: string }, fallbackSource?: string): 'letterboxd' | 'app' =>
+  item.reviewFrom ?? ((item.source ?? fallbackSource) === 'letterboxd' ? 'letterboxd' : 'app');
 
 /** A brand-new movie: the latest watch becomes the top-level fields; earlier ones go into previousWatches. */
 export function filmToNewMovie(f: LetterboxdFilm): NewMovieInput {
@@ -237,6 +245,7 @@ export function filmToNewMovie(f: LetterboxdFilm): NewMovieInput {
     dateWatched: latest?.date,
     rating: f.rating ?? latest?.rating,
     review: latest?.review,
+    reviewFrom: latest?.review ? ('letterboxd' as const) : undefined,
     rewatch: f.watches.length > 1 || f.watches.some((w) => w.rewatch) || undefined,
     tags: f.tags.length ? f.tags : undefined,
     favorite: f.liked || undefined,
@@ -252,20 +261,33 @@ export function filmToNewMovie(f: LetterboxdFilm): NewMovieInput {
  * seen. Nothing the person already has is overwritten or removed.
  * Returns undefined when there's nothing new.
  */
-export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm): LifeItemPatch | undefined {
-  type W = { date?: string; rating?: number; review?: string };
+export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm, options: { updateLetterboxdReviews?: boolean } = {}): LifeItemPatch | undefined {
+  type W = { date?: string; rating?: number; review?: string; fromLetterboxd?: boolean };
   const current: W[] = [
-    ...(existing.previousWatches ?? []).map((w) => ({ date: w.dateWatched, rating: w.rating, review: w.review })),
-    ...(existing.dateWatched || existing.rating != null || existing.review ? [{ date: existing.dateWatched, rating: existing.rating, review: existing.review }] : []),
+    ...(existing.previousWatches ?? []).map((w) => ({
+      date: w.dateWatched,
+      rating: w.rating,
+      review: w.review,
+      fromLetterboxd: w.review ? reviewFromOf(w) === 'letterboxd' : undefined,
+    })),
+    ...(existing.dateWatched || existing.rating != null || existing.review
+      ? [{ date: existing.dateWatched, rating: existing.rating, review: existing.review, fromLetterboxd: existing.review ? reviewFromOf(existing) === 'letterboxd' : undefined }]
+      : []),
   ];
   const combined = current.map((w) => ({ ...w }));
   for (const w of f.watches) {
     const same = combined.find((c) => c.date === w.date);
     if (same) {
-      same.review ||= w.review;
+      if (!same.review && w.review) {
+        same.review = w.review;
+        same.fromLetterboxd = true;
+      } else if (options.updateLetterboxdReviews && w.review && same.fromLetterboxd && sameWords(w.review, same.review) === false) {
+        // You edited this review on Letterboxd — take the new text. (Never for reviews written in the app.)
+        same.review = w.review;
+      }
       same.rating ??= w.rating;
     } else if (w.date || combined.length === 0) {
-      combined.push({ date: w.date, rating: w.rating, review: w.review });
+      combined.push({ date: w.date, rating: w.rating, review: w.review, fromLetterboxd: w.review ? true : undefined });
     }
   }
   combined.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
@@ -284,6 +306,7 @@ export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm): L
     dateWatched: latest?.date,
     rating: existing.rating ?? f.rating ?? latest?.rating,
     review: latest?.review,
+    reviewFrom: latest?.review ? (latest.fromLetterboxd ? ('letterboxd' as const) : ('app' as const)) : undefined,
     rewatch: combined.length > 1 || existing.rewatch || f.watches.some((w) => w.rewatch) || undefined,
     favorite: existing.favorite || f.liked || undefined,
     lists: lists.length ? lists : undefined,
@@ -295,6 +318,7 @@ export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm): L
     dateWatched: existing.dateWatched,
     rating: existing.rating,
     review: existing.review,
+    reviewFrom: existing.review ? reviewFromOf(existing) : undefined,
     rewatch: existing.rewatch || undefined,
     favorite: existing.favorite || undefined,
     lists: existing.lists?.length ? existing.lists : undefined,
@@ -330,7 +354,7 @@ export interface ImportPlan {
 }
 
 /** Works out exactly what an import will add and change — pure, so it can be shown before anything is written. */
-export function planImport(exp: LetterboxdExport, existingMovies: MovieItem[]): ImportPlan {
+export function planImport(exp: LetterboxdExport, existingMovies: MovieItem[], options: { updateLetterboxdReviews?: boolean } = {}): ImportPlan {
   const existing = new Map<string, MovieItem>();
   for (const m of existingMovies) if (!m.deletedAt) existing.set(filmKey(m.title, m.year), m);
   // Films you added yourself without a year: matched on title alone, when that title is unique.
@@ -350,7 +374,7 @@ export function planImport(exp: LetterboxdExport, existingMovies: MovieItem[]): 
     const match = existing.get(f.key) ?? (titleCount.get(filmKey(f.title)) === 1 ? yearless.get(filmKey(f.title)) ?? undefined : undefined);
     if (!match) creates.push(filmToNewMovie(f));
     else {
-      const patch = mergeFilmIntoExisting(match, f);
+      const patch = mergeFilmIntoExisting(match, f, options);
       if (patch) updates.push({ id: match.id, patch });
       else unchanged++;
     }

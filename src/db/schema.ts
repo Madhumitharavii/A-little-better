@@ -148,6 +148,8 @@ export interface MovieWatchEntry {
   rating?: number;
   review?: string;
   source?: 'manual' | 'letterboxd';
+  /** Where this watch's review came from — Letterboxd ones can be updated from Letterboxd; app ones never are. */
+  reviewFrom?: 'letterboxd' | 'app';
 }
 
 export interface MovieListEntry {
@@ -164,6 +166,8 @@ export interface MovieItem extends LifeItemBase {
   dateWatched?: string;
   rating?: number;
   review?: string;
+  /** Where the review came from — see MovieWatchEntry.reviewFrom. */
+  reviewFrom?: 'letterboxd' | 'app';
   /** True once there's more than one watch on record — kept for quick display, derived at write time. */
   rewatch?: boolean;
   tags?: string[];

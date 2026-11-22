@@ -1,6 +1,7 @@
 /** Reviews exported by Letterboxd and Goodreads are light HTML — turn them into plain text. */
 export function cleanReview(html: string): string {
   return html
+    .replace(/\r\n?/g, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>\s*<p>/gi, '\n\n')
     .replace(/<[^>]+>/g, '')

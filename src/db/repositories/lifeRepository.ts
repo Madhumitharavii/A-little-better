@@ -158,6 +158,7 @@ export async function logMovieRewatch(id: string): Promise<MovieItem | undefined
     rating: existing.rating,
     review: existing.review,
     source: existing.source === 'letterboxd' ? ('letterboxd' as const) : ('manual' as const),
+    reviewFrom: existing.review ? existing.reviewFrom ?? (existing.source === 'letterboxd' ? ('letterboxd' as const) : ('app' as const)) : undefined,
   };
 
   const updated: MovieItem = {
@@ -165,6 +166,7 @@ export async function logMovieRewatch(id: string): Promise<MovieItem | undefined
     dateWatched: getLocalDateKey(),
     rating: undefined,
     review: undefined,
+    reviewFrom: undefined,
     rewatch: true,
     previousWatches: [...(existing.previousWatches ?? []), archivedWatch],
     updatedAt: nowIso(),

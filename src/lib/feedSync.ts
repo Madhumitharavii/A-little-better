@@ -78,7 +78,8 @@ const friendly = (err: unknown, site: string) =>
 async function syncLetterboxd(user: string): Promise<SourceResult> {
   try {
     const exp = parseLetterboxdFeed(await fetchFeed(`source=letterboxd&user=${encodeURIComponent(user)}`));
-    const plan = planImport(exp, (await getLifeItems('movie')) as MovieItem[]);
+    // From your feed, an edited Letterboxd review replaces its older text (app-written reviews are never touched).
+    const plan = planImport(exp, (await getLifeItems('movie')) as MovieItem[], { updateLetterboxdReviews: true });
     const added = plan.creates.length ? await bulkCreateLifeItems(plan.creates) : 0;
     const updated = await bulkUpdateLifeItems(plan.updates);
     return { added, updated };

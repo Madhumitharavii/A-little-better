@@ -32,6 +32,8 @@ export default function MovieEditorModal({ existing, onClose, onSave }: MovieEdi
       status,
       rating,
       review: review.trim() || undefined,
+      // Changing the review here makes it yours: Letterboxd will never overwrite it.
+      reviewFrom: !review.trim() ? undefined : review.trim() === (existing?.review ?? '').trim() ? existing?.reviewFrom : 'app',
       rewatch,
       favorite,
       tags: existing?.tags,

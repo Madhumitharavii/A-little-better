@@ -83,3 +83,37 @@ describe('rss reader', () => {
     expect(item).toEqual({ b: 'x & y', c: '<p>raw</p>' });
   });
 });
+
+describe('edited reviews from Letterboxd', () => {
+  const feedWith = (review: string) =>
+    LB.replace('Still perfect &amp; kind.', review);
+  const fromFeed = (review: string) => parseLetterboxdFeed(feedWith(review));
+  const opts = { updateLetterboxdReviews: true };
+
+  it('replaces a Letterboxd review you edited on Letterboxd', () => {
+    const lib = planImport(fromFeed('First thoughts.'), []).creates.map((c, i) => ({ ...c, id: `n${i}`, createdAt: 'x', updatedAt: 'x' })) as MovieItem[];
+    const plan = planImport(fromFeed('Edited: even better the second time.'), lib, opts);
+    const p = plan.updates.find((u) => lib.find((m) => m.id === u.id)?.title === 'Paddington 2');
+    expect(p?.patch).toMatchObject({ review: 'Edited: even better the second time.', reviewFrom: 'letterboxd' });
+  });
+
+  it('never replaces a review written or edited in the app', () => {
+    const mine = { id: 'p', type: 'movie', title: 'Paddington 2', year: 2017, status: 'watched', dateWatched: '2026-11-14', review: 'My own words', reviewFrom: 'app', source: 'letterboxd', createdAt: 'x', updatedAt: 'x' } as MovieItem;
+    const plan = planImport(fromFeed('Something else'), [mine], opts);
+    const u = plan.updates.find((x) => x.id === 'p');
+    expect(u?.patch.review ?? mine.review).toBe('My own words');
+  });
+
+  it('a normal export import still never overwrites an existing review', () => {
+    const lib = planImport(fromFeed('First thoughts.'), []).creates.map((c, i) => ({ ...c, id: `n${i}`, createdAt: 'x', updatedAt: 'x' })) as MovieItem[];
+    const plan = planImport(fromFeed('Edited text'), lib); // no option
+    expect(plan.updates).toHaveLength(0);
+  });
+
+  it('keeps an earlier watch\'s Letterboxd review updatable after a rewatch moves it into history', () => {
+    const film = { id: 'x', type: 'movie', title: 'Paddington 2', year: 2017, status: 'watched', dateWatched: '2026-11-20', source: 'letterboxd', previousWatches: [{ id: 'w', dateWatched: '2026-11-14', review: 'Old text', source: 'letterboxd', reviewFrom: 'letterboxd' }], createdAt: 'x', updatedAt: 'x' } as MovieItem;
+    const plan = planImport(fromFeed('New text for that watch'), [film], opts);
+    const prev = (plan.updates[0]?.patch as MovieItem).previousWatches;
+    expect(prev?.find((w) => w.dateWatched === '2026-11-14')?.review).toBe('New text for that watch');
+  });
+});
