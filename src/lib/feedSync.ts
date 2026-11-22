@@ -83,7 +83,7 @@ async function fetchFeed(query: string): Promise<string> {
 const friendly = (err: unknown, site: string) =>
   err instanceof Error && err.message === 'not-found'
     ? site === 'Goodreads'
-      ? 'Goodreads hides your shelves from visitors. Paste the RSS link from My Books instead (see the note below).'
+      ? 'Goodreads switched off its shelf feeds in late October 2026, so books can’t sync automatically any more. Use Life → Books → Import from Goodreads with a fresh export instead.'
       : `${site} couldn't find that profile — check the name, and that the profile is public.`
     : `Couldn't reach ${site} right now. It'll try again later.`;
 

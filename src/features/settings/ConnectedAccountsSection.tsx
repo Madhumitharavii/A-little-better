@@ -85,8 +85,8 @@ export default function ConnectedAccountsSection({ showToast }: { showToast: (ms
         />
         {grInvalid && <span className="text-terracotta-600">Paste your profile link (it has a number in it), or just the number.</span>}
         <span className="block mt-1 text-sand-800/60 leading-relaxed">
-          If your Goodreads profile is visible to members only: on goodreads.com, open <strong>My Books</strong>, scroll to the
-          bottom, and copy the <strong>RSS</strong> link — it contains a private key that lets the app read your shelves.
+          Note: Goodreads switched off its shelf feeds in late October 2026, so Goodreads may not sync until it brings them
+          back. Meanwhile, a fresh export in Life → Books → Import from Goodreads merges safely.
         </span>
       </label>
 
