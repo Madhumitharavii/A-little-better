@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react';
 import Modal, { ModalHeader } from '@/shared/components/Modal';
+import type { SubjectItem } from '@/db/schema';
+import { useSubjects } from '@/features/study/useStudy';
+
+/** What a focus session was for — when a study subject is chosen, the time also goes to the study log. */
+export interface FocusFor {
+  subject: SubjectItem;
+  topicId?: string;
+}
 
 interface FocusTimerToolProps {
   onClose: () => void;
-  onComplete: (minutes: number) => void;
+  onComplete: (minutes: number, focusFor?: FocusFor) => void;
 }
 
 function formatTime(secs: number): string {
@@ -16,6 +24,11 @@ export default function FocusTimerTool({ onClose, onComplete }: FocusTimerToolPr
   const [durationMinutes, setDurationMinutes] = useState(10);
   const [timeLeft, setTimeLeft] = useState(600);
   const [isRunning, setIsRunning] = useState(false);
+  const subjects = useSubjects() ?? [];
+  const [subjectId, setSubjectId] = useState<string | null>(null);
+  const [topicId, setTopicId] = useState<string>('');
+  const subject = subjects.find((s) => s.id === subjectId);
+  const focusFor: FocusFor | undefined = subject ? { subject, topicId: topicId || undefined } : undefined;
 
   const selectMinutes = (mins: number) => {
     setDurationMinutes(mins);
@@ -31,13 +44,53 @@ export default function FocusTimerTool({ onClose, onComplete }: FocusTimerToolPr
 
   useEffect(() => {
     if (isRunning && timeLeft === 0) {
-      onComplete(durationMinutes);
+      onComplete(durationMinutes, focusFor);
     }
-  }, [isRunning, timeLeft, durationMinutes, onComplete]);
+  }, [isRunning, timeLeft, durationMinutes, onComplete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-sm">
-      <ModalHeader icon="🎯" title="Low-Friction Focus" onClose={onClose} />
+      <ModalHeader icon="⏳" title="Low-Friction Focus" onClose={onClose} />
+
+      {subjects.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-sand-900 text-center">What's this for?</p>
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {[{ id: null as string | null, label: 'Just focus' }, ...subjects.map((s) => ({ id: s.id as string | null, label: `${s.icon ?? '📘'} ${s.title}` }))].map((o) => (
+              <button
+                key={o.id ?? 'none'}
+                onClick={() => {
+                  setSubjectId(o.id);
+                  setTopicId('');
+                }}
+                disabled={isRunning}
+                className={`px-2.5 py-1 text-[11px] rounded-full border transition-all ${
+                  subjectId === o.id ? 'bg-sage-500 text-white border-sage-500' : 'bg-sand-50 text-sand-800 border-sand-200'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          {subject && subject.topics.length > 0 && (
+            <select
+              aria-label="Topic"
+              value={topicId}
+              onChange={(e) => setTopicId(e.target.value)}
+              disabled={isRunning}
+              className="w-full p-2 bg-sand-50 border border-sand-200 rounded-xl text-xs text-sand-900 focus:outline-none"
+            >
+              <option value="">Any topic</option>
+              {subject.topics.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {subject && <p className="text-[10px] text-sand-800/60 text-center">This time will also go to your {subject.title} study log.</p>}
+        </div>
+      )}
 
       <div className="flex justify-center gap-2">
         {[5, 10, 15, 25].map((m) => (
@@ -67,7 +120,7 @@ export default function FocusTimerTool({ onClose, onComplete }: FocusTimerToolPr
           {isRunning ? 'Pause' : 'Start Focus'}
         </button>
         <button
-          onClick={() => onComplete(Math.max(1, Math.round((durationMinutes * 60 - timeLeft) / 60)))}
+          onClick={() => onComplete(Math.max(1, Math.round((durationMinutes * 60 - timeLeft) / 60)), focusFor)}
           className="px-4 py-2.5 bg-sand-100 text-sand-800 hover:bg-sand-200 text-xs font-semibold rounded-2xl"
         >
           Log & Wrap Up

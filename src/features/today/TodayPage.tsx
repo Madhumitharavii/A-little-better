@@ -28,6 +28,7 @@ import RelationshipConnectionTool from '@/features/toolbox/tools/RelationshipCon
 import EveningModeTool from '@/features/toolbox/tools/EveningModeTool';
 import type { CareItemKey } from '@/db/schema';
 import { recordToolEvent } from '@/db/repositories/toolEventRepository';
+import { logStudySession } from '@/db/repositories/studyRepository';
 
 interface TodayPageProps {
   showToast: (msg: string) => void;
@@ -91,6 +92,7 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
             chime();
           }}
           onOpenFocusTimer={() => openTool('focusTimer')}
+          showToast={showToast}
         />
 
         <AroundMeCard
@@ -159,10 +161,15 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
       {activeTool === 'focusTimer' && (
         <FocusTimerTool
           onClose={closeTool}
-          onComplete={(mins) => {
+          onComplete={async (mins, focusFor) => {
             addMinutes('focus', mins);
+            if (focusFor) await logStudySession({ subject: focusFor.subject, topicId: focusFor.topicId, minutes: mins });
             chime();
-            showToast(`Focused for ${mins} mins. Beautiful job starting!`);
+            showToast(
+              focusFor
+                ? `Focused for ${mins} min${mins === 1 ? '' : 's'} on ${focusFor.subject.title}. Logged to your study log ✨`
+                : `Focused for ${mins} min${mins === 1 ? '' : 's'}. Beautiful job starting!`,
+            );
             closeTool();
           }}
         />
