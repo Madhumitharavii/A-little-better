@@ -369,6 +369,19 @@ export interface ToolEvent {
 }
 
 /**
+ * A tap on "I'm bored" / "I'm scrolling", stored as a row of the synced
+ * lifeItems table (like study rows) so every device sees the same taps.
+ * The old local-only `toolEvents` table is only read once, to move its rows here.
+ */
+export interface ToolEventItem extends ToolEvent {
+  type: 'toolEvent';
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+/**
  * A sentence embedding ("meaning fingerprint") computed by the on-device
  * AI model — kept ONLY on this device, never synced or backed up (it can
  * always be recomputed from the text). `hash` detects when the text changed.

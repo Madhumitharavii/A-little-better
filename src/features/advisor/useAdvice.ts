@@ -9,24 +9,23 @@ import { useAiEnabled, useAiState } from '@/features/ai/aiEngine';
 /** Everything the advisor reads — straight from the local database. */
 function useAdvisorData(): AdvisorData | undefined {
   return useLiveQuery(async () => {
-    const [care, journal, reflections, life, people, toolEvents] = await Promise.all([
+    const [care, journal, reflections, life, people] = await Promise.all([
       db.careEntries.toArray(),
       db.journalEntries.toArray(),
       db.dailyReflections.toArray(),
       db.lifeItems.toArray(),
       db.people.toArray(),
-      db.toolEvents.toArray(),
     ]);
-    // The lifeItems table also holds study rows — split them out.
+    // The lifeItems table also holds study rows and "I'm bored" taps — split them out.
     const rows = life.filter((i) => !i.deletedAt) as unknown as Array<{ type: string }>;
     return {
       today: getLocalDateKey(),
       care,
       journal: journal.filter((j) => !j.deletedAt),
       reflections,
-      life: rows.filter((i) => i.type !== 'subject' && i.type !== 'studySession') as unknown as AdvisorData['life'],
+      life: rows.filter((i) => i.type !== 'subject' && i.type !== 'studySession' && i.type !== 'toolEvent') as unknown as AdvisorData['life'],
       people: people.filter((p) => !p.deletedAt),
-      toolEvents,
+      toolEvents: rows.filter((i) => i.type === 'toolEvent') as unknown as AdvisorData['toolEvents'],
       subjects: rows.filter((i) => i.type === 'subject') as unknown as AdvisorData['subjects'],
       studySessions: rows.filter((i) => i.type === 'studySession') as unknown as AdvisorData['studySessions'],
     };

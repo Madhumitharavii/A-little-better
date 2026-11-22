@@ -51,7 +51,7 @@ A personal collection, grouped into **My archive** and **Looking ahead**:
 ### Me
 - **My People** — the people I want to stay close to, with "last connected" tracking
 - Best-effort local reminders (wind-down and get-up)
-- Cycle tracking with import
+- Cycle tracking, with import from **Flo's JSON data export** (cycles, with a preview of typical cycle and period length) or any CSV
 - **Patterns & Insights** — reading, room resets, focus time, current streaks
 
 ### Settings
@@ -177,7 +177,7 @@ supabase/                SQL migrations and sync documentation
 - **Cloud (optional):** Supabase — Auth, Postgres with Row Level Security, Storage
 - **On-device AI:** Transformers.js, ONNX Runtime Web (WebAssembly), all-MiniLM-L6-v2
 - **Testing:** Vitest with fake-indexeddb
-- **Imports:** Goodreads CSV, and the whole unzipped Letterboxd export folder
+- **Imports:** Goodreads CSV, the whole unzipped Letterboxd export folder, and Flo's JSON export (or any cycle CSV)
 
 ## Testing
 

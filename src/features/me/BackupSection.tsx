@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db/db';
-import { clearToolEvents } from '@/db/repositories/toolEventRepository';
+import { clearToolEvents, getToolEvents } from '@/db/repositories/toolEventRepository';
 import {
   exportAllData,
   downloadBackupFile,
@@ -20,7 +19,7 @@ type PendingImport = { file: BackupFile; validation: BackupValidationResult };
 
 export default function BackupSection({ showToast }: BackupSectionProps) {
   // "I'm bored" / "I'm scrolling" taps — kept only on this device, for Noticed for You.
-  const tapCount = useLiveQuery(() => db.toolEvents.count(), []) ?? 0;
+  const tapCount = useLiveQuery(async () => (await getToolEvents()).length, []) ?? 0;
   const [confirmClearTaps, setConfirmClearTaps] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [pending, setPending] = useState<PendingImport | null>(null);
@@ -88,7 +87,7 @@ export default function BackupSection({ showToast }: BackupSectionProps) {
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-sand-900">"I'm bored" &amp; "I'm scrolling" taps</p>
             <p className="text-[11px] text-sand-800/60">
-              {tapCount === 0 ? 'None saved.' : `${tapCount} saved on this device only (never synced). Noticed for You uses them to spot patterns.`}
+              {tapCount === 0 ? 'None saved.' : `${tapCount} saved, the same on all your devices. Noticed for You uses them to spot patterns.`}
             </p>
           </div>
           {tapCount > 0 && !confirmClearTaps && (
@@ -102,7 +101,7 @@ export default function BackupSection({ showToast }: BackupSectionProps) {
         </div>
         {confirmClearTaps && (
           <div className="flex items-center gap-2 text-xs">
-            <p className="flex-1 text-sand-800/80">Forget all {tapCount} taps? Your journal, care and everything else stay.</p>
+            <p className="flex-1 text-sand-800/80">Forget all {tapCount} taps, on every device? Your journal, care and everything else stay.</p>
             <button
               onClick={async () => {
                 const n = await clearToolEvents();
