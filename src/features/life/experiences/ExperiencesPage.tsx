@@ -42,7 +42,7 @@ export default function ExperiencesPage({ showToast, onBack, initialOpenItem }: 
           <p className="text-sm text-sand-800/70">Nothing here yet. Little adventures welcome.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3 lg:items-start">
           {experiences.map((exp) => (
             <ExperienceCard key={exp.id} experience={exp} onClick={() => setDetail(exp)} />
           ))}

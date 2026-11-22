@@ -15,7 +15,7 @@ interface SettingsPageProps {
  */
 export default function SettingsPage({ showToast, onBack }: SettingsPageProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
       <section className="bg-white p-5 sm:p-8 rounded-3xl border border-sand-200 shadow-sm space-y-6">
         <div className="border-b border-sand-100 pb-3 flex items-start justify-between gap-3">
           <div>

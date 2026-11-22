@@ -131,11 +131,17 @@ export default function WeekPage({ showToast }: { showToast: (msg: string) => vo
         </p>
       </section>
 
+      {/* Two columns on a wide window: the week + learning | little things, activity, cycle. */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 sm:gap-8 items-start">
+      <div className="space-y-6 sm:space-y-8 xl:col-span-7 min-w-0">
       {/* The week in its own words (on-device AI, when it's on) */}
       <WeekSummaryCard />
 
       {/* What I'm learning — study timer, subjects, and sessions */}
       <StudySection showToast={showToast} onOpenSubject={setOpenSubjectId} />
+      </div>
+
+      <div className="space-y-6 sm:space-y-8 xl:col-span-5 min-w-0">
 
       {/* Little things from this week — built from actual logged activity */}
       <section className="bg-terracotta-100/50 p-5 rounded-3xl border border-terracotta-400/20 shadow-sm space-y-3">
@@ -202,6 +208,8 @@ export default function WeekPage({ showToast }: { showToast: (msg: string) => vo
           <p className="text-[10px] text-sand-800/40 shrink-0">See Me → Cycle Tracking</p>
         </section>
       )}
+      </div>
+      </div>
 
     </div>
   );

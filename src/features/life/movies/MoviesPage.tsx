@@ -149,14 +149,14 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
           <p className="text-sm text-sand-800/70">Nothing here yet.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
           {filtered.slice(0, visible).map((movie) => (
             <MovieCard key={movie.id} movie={movie} onClick={() => setDetail(movie)} />
           ))}
           {filtered.length > visible && (
             <button
               onClick={() => setVisible((v) => v + PAGE * 2)}
-              className="sm:col-span-2 py-3 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl"
+              className="sm:col-span-2 lg:col-span-3 2xl:col-span-4 py-3 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl"
             >
               Show more ({(filtered.length - visible).toLocaleString()} left)
             </button>

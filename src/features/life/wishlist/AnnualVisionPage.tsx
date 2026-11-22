@@ -92,7 +92,7 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
       ) : (
         <div className="space-y-4">
           {pending.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2 lg:items-start">
               {pending.map((wish) => (
                 <div
                   key={wish.id}
@@ -147,8 +147,8 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
           )}
 
           {done.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60 pt-2">Achieved 🤜🤛</h3>
+            <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2 lg:items-start">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60 pt-2 lg:col-span-2">Achieved 🤜🤛</h3>
               {done.map((wish) => (
                 <div key={wish.id} className="flex items-center gap-3 p-3 bg-terracotta-100/50 rounded-2xl border border-terracotta-400/30">
                   <button
@@ -182,9 +182,9 @@ export default function AnnualVisionPage({ showToast, onBack, initialOpenItem }:
           )}
 
           {missed.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60 pt-2">Missed this time 🌧️</h3>
-              <p className="text-[11px] text-sand-800/50 -mt-1">That's okay. Some things only fit a moment. Try again next year, or let them go.</p>
+            <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2 lg:items-start">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60 pt-2 lg:col-span-2">Missed this time 🌧️</h3>
+              <p className="text-[11px] text-sand-800/50 -mt-1 lg:mt-0 lg:col-span-2">That's okay. Some things only fit a moment. Try again next year, or let them go.</p>
               {missed.map((wish) => (
                 <div key={wish.id} className="flex items-center gap-3 p-3 bg-sand-100/60 rounded-2xl border border-sand-200">
                   <span className="w-7 h-7 shrink-0 rounded-full border-2 border-dashed border-sand-300" aria-hidden />

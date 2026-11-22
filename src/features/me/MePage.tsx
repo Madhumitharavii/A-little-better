@@ -18,7 +18,7 @@ export default function MePage({ showToast }: MePageProps) {
           <p className="text-xs text-sand-800/60">My people, my rhythms, and life patterns.</p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4 xl:items-start">
           <PeopleSection showToast={showToast} />
           <RemindersSection />
           <PeriodSection showToast={showToast} />

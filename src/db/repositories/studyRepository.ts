@@ -13,13 +13,13 @@ import type { LifeItem, StudySessionItem, StudyTopic, SubjectItem, TopicStatus }
 const table = () => db.lifeItems as unknown as import('dexie').Table<SubjectItem | StudySessionItem, string>;
 
 export async function getSubjects(): Promise<SubjectItem[]> {
-  const rows = await table().where('type').equals('subject').toArray();
-  return (rows as SubjectItem[]).filter((s) => !s.deletedAt).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const rows = (await table().toArray()).filter((r) => r.type === 'subject');
+  return (rows as SubjectItem[]).filter((s) => !s.deletedAt).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
 }
 
 export async function getStudySessions(): Promise<StudySessionItem[]> {
-  const rows = await table().where('type').equals('studySession').toArray();
-  return (rows as StudySessionItem[]).filter((s) => !s.deletedAt).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  const rows = (await table().toArray()).filter((r) => r.type === 'studySession');
+  return (rows as StudySessionItem[]).filter((s) => !s.deletedAt).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
 export async function createSubject(input: { title: string; icon?: string; goal?: string; goalDate?: string; topicNames?: string[] }, createdAt?: string): Promise<SubjectItem> {

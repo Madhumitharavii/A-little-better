@@ -63,23 +63,35 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
   const chime = (type: 'gentle' | 'complete' = 'complete') => playSoftChime(soundEnabled, type);
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <GreetingHeader
-        date={date}
-        streaks={streaks}
-        onOpenBored={() => openTool('bored')}
-        onOpenScrolling={() => openTool('scrolling')}
-      />
+    // One column on phones; two from tablet width; on a wide window, three columns:
+    //   greeting · thought
+    //   today's focus
+    //   Care for Me · Care Around Me · Noticed + This Evening
+    //   toolbox
+    // (The order on the page is unchanged, so phones read top to bottom as before.)
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-[auto_auto_auto_1fr_auto] gap-6 sm:gap-8 xl:gap-6 items-start">
+      <div className="md:col-span-2 xl:col-span-8 xl:row-start-1 xl:h-full xl:[&>*]:h-full">
+        <GreetingHeader
+          date={date}
+          streaks={streaks}
+          onOpenBored={() => openTool('bored')}
+          onOpenScrolling={() => openTool('scrolling')}
+        />
+      </div>
 
-      <ThoughtOfTheDayCard />
+      <div className="md:col-span-2 xl:col-span-4 xl:row-start-1 xl:h-full xl:[&>*]:h-full xl:[&>*]:flex xl:[&>*]:flex-col xl:[&>*]:justify-center">
+        <ThoughtOfTheDayCard />
+      </div>
 
-      <TodayFocusBanner
-        myselfDone={findEntry('bathed')?.status === 'done' || findEntry('ateFruit')?.status === 'done'}
-        spaceDone={findEntry('spaceReset')?.status === 'done'}
-        peopleDone={findEntry('messageReset')?.status === 'done' || findEntry('relationshipCheck')?.status === 'done'}
-      />
+      <div className="md:col-span-2 xl:col-span-12 xl:row-start-2">
+        <TodayFocusBanner
+          myselfDone={findEntry('bathed')?.status === 'done' || findEntry('ateFruit')?.status === 'done'}
+          spaceDone={findEntry('spaceReset')?.status === 'done'}
+          peopleDone={findEntry('messageReset')?.status === 'done' || findEntry('relationshipCheck')?.status === 'done'}
+        />
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 items-start">
+      <div className="xl:col-span-4 xl:col-start-1 xl:row-start-3 xl:row-span-2">
         <CareForMeSection
           findEntry={(key) => findEntry(key as CareItemKey)}
           onToggleDone={(key) => {
@@ -94,7 +106,9 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
           onOpenFocusTimer={() => openTool('focusTimer')}
           showToast={showToast}
         />
+      </div>
 
+      <div className="xl:col-span-4 xl:col-start-5 xl:row-start-3 xl:row-span-2">
         <AroundMeCard
           spaceDone={findEntry('spaceReset')?.status === 'done'}
           messagesDone={findEntry('messageReset')?.status === 'done'}
@@ -106,19 +120,25 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
       </div>
 
       {/* Gentle advice from what's been logged — worked out on-device. */}
-      <AdvisorCard />
+      <div className="md:col-span-2 xl:col-span-4 xl:col-start-9 xl:row-start-3">
+        <AdvisorCard />
+      </div>
 
       {/* Folded by default — see ToolboxGrid. Sits after the daily care
           so the everyday checklist comes first. */}
-      <ToolboxGrid openTool={openTool} />
+      <div className="md:col-span-2 xl:col-span-12 xl:row-start-5">
+        <ToolboxGrid openTool={openTool} />
+      </div>
 
-      <EveningReflectionCard
-        gratitude={reflection?.gratitude ?? ''}
-        smallWin={reflection?.smallWin ?? ''}
-        onChange={(field, value) => saveReflectionField(field, value)}
-        eveningDone={!!reflection?.eveningDone}
-        onOpenEvening={() => openTool('evening')}
-      />
+      <div className="md:col-span-2 xl:col-span-4 xl:col-start-9 xl:row-start-4">
+        <EveningReflectionCard
+          gratitude={reflection?.gratitude ?? ''}
+          smallWin={reflection?.smallWin ?? ''}
+          onChange={(field, value) => saveReflectionField(field, value)}
+          eveningDone={!!reflection?.eveningDone}
+          onOpenEvening={() => openTool('evening')}
+        />
+      </div>
 
       {/* Skip reason */}
       {skipTarget && (

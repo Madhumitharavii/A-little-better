@@ -45,7 +45,7 @@ export default function StatsSection() {
       </h3>
       <p className="text-xs text-sand-800/70 mb-4">A record of life, not a performance evaluation.</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
         {tiles.map((tile, i) => (
           <div
             key={tile.text}

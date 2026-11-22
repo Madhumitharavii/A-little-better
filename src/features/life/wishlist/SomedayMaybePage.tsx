@@ -72,7 +72,7 @@ export default function SomedayMaybePage({ showToast, onBack, initialOpenItem }:
       ) : (
         <div className="space-y-4">
           {pending.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2 lg:items-start">
               {pending.map((wish, i) => (
                 <div key={wish.id} className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-sand-200 shadow-sm">
                   <button
@@ -99,8 +99,8 @@ export default function SomedayMaybePage({ showToast, onBack, initialOpenItem }:
           )}
 
           {done.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60 pt-2">Done ✨</h3>
+            <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2 lg:items-start">
+              <h3 className="lg:col-span-2 text-xs font-bold uppercase tracking-wider text-sand-800/60 pt-2">Done ✨</h3>
               {done.map((wish) => (
                 <div key={wish.id} className="flex items-center gap-3 p-3 bg-sage-100/40 rounded-2xl border border-sage-300">
                   <button

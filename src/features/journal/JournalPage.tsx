@@ -37,7 +37,7 @@ export default function JournalPage({ showToast }: JournalPageProps) {
           <p className="text-sm text-sand-800/70">Nothing here yet — and that's alright.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
           {entries.map((entry) => (
             <JournalEntryCard
               key={entry.id}

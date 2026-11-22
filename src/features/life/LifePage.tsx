@@ -94,7 +94,7 @@ export default function LifePage({ showToast, openItemId, onOpenedItem }: LifePa
       <LifeSearchBar value={query} onChange={setQuery} />
 
       {query.trim() ? (
-        <section className="space-y-2">
+        <section className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2">
           {searchResults.length === 0 ? (
             <p className="text-xs text-sand-800/60 text-center py-6">Nothing found yet.</p>
           ) : (
@@ -104,15 +104,15 @@ export default function LifePage({ showToast, openItemId, onOpenedItem }: LifePa
       ) : (
         <>
           {[
-            { heading: 'My archive', note: '', cards: categoryCards.slice(0, 5) },
-            { heading: 'Looking ahead', note: 'Things to try and this year\'s vision', cards: categoryCards.slice(5) },
+            { heading: 'My archive', note: '', cards: categoryCards.slice(0, 5), cols: 'md:grid-cols-3 xl:grid-cols-5' },
+            { heading: 'Looking ahead', note: 'Things to try and this year\'s vision', cards: categoryCards.slice(5), cols: 'md:grid-cols-2' },
           ].map((group) => (
             <section key={group.heading} className="space-y-3">
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60">{group.heading}</h3>
                 {group.note && <span className="text-[11px] text-sand-800/50 text-right">{group.note}</span>}
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className={`grid grid-cols-2 ${group.cols} gap-3 sm:gap-4`}>
                 {group.cards.map((cat) => (
                   <button
                     key={cat.view}
@@ -134,7 +134,7 @@ export default function LifePage({ showToast, openItemId, onOpenedItem }: LifePa
           {recentlyAdded.length > 0 && (
             <section className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60">Recently added</h3>
-              <div className="space-y-2">
+              <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2">
                 {recentlyAdded.map((item) => (
                   <LifeItemMiniCard key={item.id} item={item} onClick={() => openFromAnywhere(item)} />
                 ))}

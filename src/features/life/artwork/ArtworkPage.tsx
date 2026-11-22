@@ -42,7 +42,7 @@ export default function ArtworkPage({ showToast, onBack, initialOpenItem }: Artw
           <p className="text-sm text-sand-800/70">Nothing here yet. Doodles welcome.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {artworks.map((art) => (
             <ArtworkTile key={art.id} artwork={art} onClick={() => setDetail(art)} />
           ))}

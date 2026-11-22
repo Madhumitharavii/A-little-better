@@ -20,6 +20,11 @@ const isLifeItem = (item: { type: string; deletedAt?: string | null }): item is 
   !item.deletedAt && (LIFE_ITEM_TYPES as readonly string[]).includes(item.type);
 
 function sortKey(item: LifeItem): string {
+  const key = rawSortKey(item);
+  return typeof key === 'string' ? key : String(item.createdAt ?? '');
+}
+
+function rawSortKey(item: LifeItem): unknown {
   switch (item.type) {
     case 'book':
       return item.dateFinished ?? item.dateStarted ?? item.dateAdded ?? item.createdAt;
@@ -37,8 +42,10 @@ function sortKey(item: LifeItem): string {
 }
 
 export async function getLifeItems(type?: LifeItemType): Promise<LifeItem[]> {
-  const all = type ? await db.lifeItems.where('type').equals(type).toArray() : await db.lifeItems.toArray();
-  return all.filter(isLifeItem).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+  // A full read + filter rather than the `type` index: it's just as fast at this size, and it can't
+  // come back empty if a device's index ever disagrees with its rows (which hid Annual Vision once).
+  const all = await db.lifeItems.toArray();
+  return all.filter((item) => isLifeItem(item) && (!type || item.type === type)).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
 }
 
 export async function getLifeItem(id: string): Promise<LifeItem | undefined> {

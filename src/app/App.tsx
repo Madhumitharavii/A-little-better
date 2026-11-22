@@ -129,9 +129,69 @@ export default function App() {
     showToast(next ? 'Subtle chimes enabled 🔔' : 'Sound turned off 🔇');
   };
 
+  const goTo = (tab: TabId) => {
+    setCurrentTab(tab);
+    setLastTab(tab);
+  };
+
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-16 min-h-screen">
-      <header className="pb-6 border-b border-sand-200">
+    <div className="min-h-screen lg:flex">
+      {/* Wide windows (Mac, tablet landscape): navigation in a sidebar on the left. */}
+      <aside className="hidden lg:flex flex-col w-60 shrink-0 h-screen sticky top-0 border-r border-sand-200 px-5 py-7 gap-7">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 shrink-0 rounded-2xl bg-terracotta-400/10 flex items-center justify-center text-xl">🍃</div>
+          <div className="min-w-0">
+            <p className="font-serif text-lg font-semibold text-sand-900 tracking-tight leading-tight">A Little Better</p>
+            <p className="text-[10px] text-sand-800/70 italic font-serif leading-snug">Don't optimize your life. Take care of it.</p>
+          </div>
+        </div>
+
+        <nav className="flex flex-col gap-1 text-sm font-medium" aria-label="Sections">
+          {TABS.map((tab) => {
+            const isActive = currentTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => goTo(tab.id)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`text-left px-3 py-2.5 rounded-xl transition-all ${
+                  isActive ? 'bg-terracotta-100/70 text-terracotta-600 font-semibold' : 'text-sand-800/80 hover:bg-sand-100 hover:text-sand-900'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="space-y-2">
+          <NoticedButton />
+          <StudyTimerPill onOpen={() => goTo('week')} />
+        </div>
+
+        <div className="mt-auto flex flex-col gap-1.5 text-xs">
+          <button
+            onClick={toggleSound}
+            className="text-left text-terracotta-600 hover:text-terracotta-600/80 font-semibold px-3 py-2 rounded-xl bg-terracotta-100/70 transition-colors"
+          >
+            {settings?.soundEnabled ? '🔔 Chimes On' : '🔇 Quiet Mode'}
+          </button>
+          <button
+            onClick={() => setCurrentTab(currentTab === 'settings' ? lastTab : 'settings')}
+            aria-pressed={currentTab === 'settings'}
+            className={`text-left px-3 py-2 rounded-xl transition-colors ${
+              currentTab === 'settings' ? 'bg-sand-100 text-sand-900 font-semibold' : 'bg-slate-100 text-slate-800 hover:text-slate-900'
+            }`}
+          >
+            <span aria-hidden="true">⚙️</span> Settings
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex-1 min-w-0">
+    <div className="max-w-3xl lg:max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 pt-6 lg:pt-10 pb-16">
+      {/* Phones and narrow windows: the header with tabs on top. */}
+      <header className="pb-6 border-b border-sand-200 lg:hidden">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-terracotta-400/10 flex items-center justify-center text-terracotta-600 text-xl font-bold">
@@ -211,7 +271,7 @@ export default function App() {
 
       <Toast message={toastMessage} />
 
-      <main className="mt-8">
+      <main className="mt-8 lg:mt-0">
         {currentTab === 'today' && <TodayPage showToast={showToast} soundEnabled={!!settings?.soundEnabled} />}
         {currentTab === 'week' && <WeekPage showToast={showToast} />}
         {currentTab === 'life' && <LifePage showToast={showToast} openItemId={lifeItemToOpen} onOpenedItem={() => setLifeItemToOpen(null)} />}
@@ -219,7 +279,8 @@ export default function App() {
         {currentTab === 'me' && <MePage showToast={showToast} />}
         {currentTab === 'settings' && <SettingsPage showToast={showToast} onBack={() => setCurrentTab(lastTab)} />}
       </main>
-
+    </div>
+      </div>
     </div>
   );
 }
