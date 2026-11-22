@@ -48,10 +48,35 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache the built app shell so the app loads with no network at all.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // Precache the app's code and icons so it works with no network at all. The page itself
+        // (index.html) is NOT precached: it's fetched network-first below, so when you're online
+        // the app always opens on the newest version — instead of showing an older saved copy
+        // first and then switching (which made the layout flip between versions).
+        globPatterns: ['**/*.{js,css,svg,png,ico}'],
         globIgnores: ['**/models/**', '**/ort/**'],
+        navigateFallback: null,
         runtimeCaching: [
+          {
+            // Opening the app: newest page when online; the last saved page when offline or slow.
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pages',
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 4 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // Built code files have unique names per version — keep the ones a saved page may still need.
+            urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'app-assets',
+              expiration: { maxEntries: 40 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
           {
             // The on-device AI model and engine, served by the app itself.
             urlPattern: ({ url }) => url.pathname.startsWith('/models/') || url.pathname.startsWith('/ort/'),
