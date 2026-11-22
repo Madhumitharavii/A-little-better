@@ -23,8 +23,23 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
+/**
+ * Every request gets a time limit, so one that hangs (a flaky network, a sleeping laptop)
+ * fails and is retried next time instead of blocking all later syncs forever.
+ * Photo uploads/downloads get longer.
+ */
+export function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  const limitMs = url.includes('/storage/') ? 60_000 : 30_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), limitMs);
+  init?.signal?.addEventListener('abort', () => controller.abort());
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl as string, supabaseAnonKey as string, {
+      global: { fetch: fetchWithTimeout },
       auth: {
         // Sessions persist in IndexedDB-backed storage by default in
         // supabase-js; fine to leave as the library default for now.

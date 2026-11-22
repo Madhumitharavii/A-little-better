@@ -8,7 +8,10 @@
  * Nothing is stored or logged here.
  *
  *   /api/feed?source=letterboxd&user=<username>
- *   /api/feed?source=goodreads&user=<user number>&shelf=read|currently-reading|to-read
+ *   /api/feed?source=goodreads&user=<user number>&shelf=read|currently-reading|to-read[&key=<rss key>]
+ *
+ * Goodreads profiles visible only to members need the private `key` from the
+ * RSS link on your My Books page; it's passed through to Goodreads, never stored.
  */
 export const config = { runtime: 'edge' };
 
@@ -21,7 +24,9 @@ export function feedUrl(params: URLSearchParams): string | null {
   if (source === 'goodreads' && /^\d{1,12}$/.test(user)) {
     const shelf = params.get('shelf') ?? 'read';
     if (!SHELVES.has(shelf)) return null;
-    return `https://www.goodreads.com/review/list_rss/${user}?shelf=${shelf}&per_page=100`;
+    const key = params.get('key');
+    if (key !== null && !/^[A-Za-z0-9_-]{6,100}$/.test(key)) return null;
+    return `https://www.goodreads.com/review/list_rss/${user}?shelf=${shelf}&per_page=100${key ? `&key=${key}` : ''}`;
   }
   return null;
 }

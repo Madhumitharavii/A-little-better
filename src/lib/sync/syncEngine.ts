@@ -363,6 +363,9 @@ async function syncSettings(
       deviceId: currentLocal.deviceId,
       lastSyncedAt: currentLocal.lastSyncedAt,
       syncCursors: currentLocal.syncCursors,
+      // Reminders fire per device — keep this device's own "shown today" notes.
+      lastNightReminderFiredDate: currentLocal.lastNightReminderFiredDate,
+      lastMorningReminderFiredDate: currentLocal.lastMorningReminderFiredDate,
     });
   }
 }

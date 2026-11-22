@@ -4,6 +4,7 @@ import {
   describeSource,
   getConnectedAccounts,
   goodreadsIdFrom,
+  goodreadsKeyFrom,
   letterboxdUserFrom,
   setConnectedAccounts,
   syncFeeds,
@@ -24,7 +25,8 @@ export default function ConnectedAccountsSection({ showToast }: { showToast: (ms
   useEffect(() => {
     void getConnectedAccounts().then((a) => {
       setLetterboxd(a.letterboxd ?? '');
-      setGoodreads(a.goodreadsId ?? '');
+      // Show the RSS link back if one was saved (it carries the key), else just the number.
+      setGoodreads(a.goodreadsId ? (a.goodreadsKey ? `https://www.goodreads.com/review/list_rss/${a.goodreadsId}?key=${a.goodreadsKey}` : a.goodreadsId) : '');
       setLoaded(true);
     });
   }, []);
@@ -37,7 +39,7 @@ export default function ConnectedAccountsSection({ showToast }: { showToast: (ms
   const saveAndCheck = async () => {
     if (lbInvalid || grInvalid) return;
     setBusy(true);
-    await setConnectedAccounts({ letterboxd: lbUser, goodreadsId: grId });
+    await setConnectedAccounts({ letterboxd: lbUser, goodreadsId: grId, goodreadsKey: grId ? goodreadsKeyFrom(goodreads) : undefined });
     const result = await syncFeeds();
     setBusy(false);
     if (!result) showToast('Accounts cleared.');
@@ -71,7 +73,7 @@ export default function ConnectedAccountsSection({ showToast }: { showToast: (ms
       </label>
 
       <label className="block text-[11px]">
-        <span className="font-semibold text-sand-900">Goodreads profile link</span>
+        <span className="font-semibold text-sand-900">Goodreads RSS link (or profile link)</span>
         <input
           value={goodreads}
           onChange={(e) => setGoodreads(e.target.value)}
@@ -82,6 +84,10 @@ export default function ConnectedAccountsSection({ showToast }: { showToast: (ms
           className="mt-1 w-full p-2.5 bg-sand-50 border border-sand-200 rounded-xl text-xs text-sand-900 focus:outline-none"
         />
         {grInvalid && <span className="text-terracotta-600">Paste your profile link (it has a number in it), or just the number.</span>}
+        <span className="block mt-1 text-sand-800/60 leading-relaxed">
+          If your Goodreads profile is visible to members only: on goodreads.com, open <strong>My Books</strong>, scroll to the
+          bottom, and copy the <strong>RSS</strong> link — it contains a private key that lets the app read your shelves.
+        </span>
       </label>
 
       <button

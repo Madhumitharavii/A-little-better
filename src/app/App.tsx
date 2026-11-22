@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { TABS, type TabId } from './routes';
-import { getSettings, saveSettings } from '@/db/repositories/settingsRepository';
+import { getSettings, saveDeviceBookkeeping, saveSettings } from '@/db/repositories/settingsRepository';
 import Toast from '@/shared/components/Toast';
 import { useToast } from '@/shared/hooks/useToast';
 import TodayPage from '@/features/today/TodayPage';
@@ -87,8 +87,10 @@ export default function App() {
       getSettings().then((current) => {
         const result = checkReminders(current);
         const today = getLocalDateKey();
-        if (result.nightFired) saveSettings({ lastNightReminderFiredDate: today });
-        if (result.morningFired) saveSettings({ lastMorningReminderFiredDate: today });
+        // Per-device bookkeeping: doesn't count as a settings change (that used to make this
+        // device's whole settings row — its theme included — overwrite your other devices').
+        if (result.nightFired) saveDeviceBookkeeping({ lastNightReminderFiredDate: today });
+        if (result.morningFired) saveDeviceBookkeeping({ lastMorningReminderFiredDate: today });
         if (result.nightFallbackMessage) showToast(result.nightFallbackMessage);
         if (result.morningFallbackMessage) showToast(result.morningFallbackMessage);
       });

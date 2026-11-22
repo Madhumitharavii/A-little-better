@@ -4,7 +4,7 @@ import { parseLetterboxdFeed } from '@/features/life/feeds/letterboxdFeed';
 import { parseGoodreadsFeed } from '@/features/life/feeds/goodreadsFeed';
 import { planImport } from '@/features/life/movies/letterboxdImport';
 import { planGoodreadsImport } from '@/features/life/books/goodreadsImport';
-import { goodreadsIdFrom, letterboxdUserFrom } from '@/lib/feedSync';
+import { goodreadsIdFrom, goodreadsKeyFrom, letterboxdUserFrom } from '@/lib/feedSync';
 import { feedUrl } from '../api/feed';
 import type { MovieItem } from '@/db/schema';
 
@@ -115,5 +115,14 @@ describe('edited reviews from Letterboxd', () => {
     const plan = planImport(fromFeed('New text for that watch'), [film], opts);
     const prev = (plan.updates[0]?.patch as MovieItem).previousWatches;
     expect(prev?.find((w) => w.dateWatched === '2026-11-14')?.review).toBe('New text for that watch');
+  });
+});
+
+describe('Goodreads private RSS link', () => {
+  it('passes the key from the My Books RSS link through, and nothing else', () => {
+    expect(goodreadsKeyFrom('https://www.goodreads.com/review/list_rss/123?key=AbC-123_xyz&shelf=%23ALL%23')).toBe('AbC-123_xyz');
+    expect(goodreadsKeyFrom('https://www.goodreads.com/user/show/123-someone')).toBeUndefined();
+    expect(feedUrl(new URLSearchParams('source=goodreads&user=123&shelf=read&key=AbC-123_xyz'))).toBe('https://www.goodreads.com/review/list_rss/123?shelf=read&per_page=100&key=AbC-123_xyz');
+    expect(feedUrl(new URLSearchParams('source=goodreads&user=123&shelf=read&key=bad%26evil=1'))).toBeNull();
   });
 });

@@ -1,4 +1,6 @@
 import { readPref, watchPref, writePref } from '@/db/repositories/syncedPrefs';
+import { getLifeRows, subscribeLifeRows } from '@/db/lifeStore';
+import { mergeDuplicateSubjects } from '@/db/repositories/studyRepository';
 import { applyAiEnabled, isAiEnabled } from '@/features/ai/aiEngine';
 import { applySeen, getSeen, loadHistory, mergeHistory, mergeSeen, saveHistory, subscribeHistory, subscribeSeen, type AdvisorHistory, type SeenToday } from '@/features/advisor/select';
 import { applyStudyTimer, getStudyTimer, subscribeStudyTimer, type RunningStudyTimer } from '@/features/study/studyTimer';
@@ -23,7 +25,31 @@ const quietly = (fn: () => void) => {
 };
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
+/** Doubled study subjects (same name twice) are merged as soon as they appear — not only after a sync. */
+function watchDoubledSubjects(): void {
+  let timer: number | undefined;
+  subscribeLifeRows(() => {
+    const rows = getLifeRows();
+    if (!rows) return;
+    const seen = new Set<string>();
+    let doubled = false;
+    for (const r of rows) {
+      if (r.type !== 'subject' || r.deletedAt) continue;
+      const key = String(r.title ?? '').trim().toLowerCase();
+      if (seen.has(key)) {
+        doubled = true;
+        break;
+      }
+      seen.add(key);
+    }
+    if (!doubled) return;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => void mergeDuplicateSubjects(), 1500);
+  });
+}
+
 export function startPrefSync(): void {
+  watchDoubledSubjects();
   // On-device AI switch.
   watchPref<boolean>('aiEnabled', (on) => {
     if (typeof on === 'boolean' && on !== isAiEnabled()) applyAiEnabled(on);

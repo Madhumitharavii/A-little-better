@@ -78,6 +78,12 @@ export async function saveSettings(patch: SettingsPatch): Promise<AppSettings> {
   return updated;
 }
 
+/** Reminder "already shown today" notes: per device, saved WITHOUT counting as a settings change. */
+export async function saveDeviceBookkeeping(patch: Partial<Pick<AppSettings, 'lastNightReminderFiredDate' | 'lastMorningReminderFiredDate'>>): Promise<void> {
+  await ensureDefaultSettings();
+  await db.settings.update(SETTINGS_ID, patch);
+}
+
 type SyncBookkeepingPatch = Partial<Pick<AppSettings, 'deviceId' | 'lastSyncedAt' | 'syncCursors'>>;
 
 /**

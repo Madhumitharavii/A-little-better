@@ -18,6 +18,11 @@ export interface ConnectedAccounts {
   letterboxd?: string;
   /** The number in your Goodreads profile link (goodreads.com/user/show/12345678-name). */
   goodreadsId?: string;
+  /**
+   * The private key from your Goodreads RSS link (My Books → RSS), needed when your
+   * profile is visible to members only. Stored with your data, never in the code.
+   */
+  goodreadsKey?: string;
 }
 
 type SourceResult = { added: number; updated: number } | { error: string };
@@ -49,11 +54,16 @@ export async function setConnectedAccounts(accounts: ConnectedAccounts): Promise
   await writePref('connectedAccounts', accounts);
 }
 
-/** "12345678", "goodreads.com/user/show/12345678-name" or a review-list link → "12345678". */
+/** "12345678", "goodreads.com/user/show/12345678-name" or a review-list / RSS link → "12345678". */
 export function goodreadsIdFrom(input: string): string | undefined {
   const t = input.trim();
   const m = t.match(/(?:user\/show|review\/list(?:_rss)?)\/(\d+)/) ?? t.match(/^(\d{1,12})$/);
   return m?.[1];
+}
+
+/** The private key in a Goodreads RSS link ("…/review/list_rss/123?key=AbC…&shelf=read"), if there is one. */
+export function goodreadsKeyFrom(input: string): string | undefined {
+  return input.match(/[?&]key=([A-Za-z0-9_-]{6,100})/)?.[1];
 }
 
 /** "someone", "@someone" or "letterboxd.com/someone/" → "someone". */
@@ -72,7 +82,9 @@ async function fetchFeed(query: string): Promise<string> {
 
 const friendly = (err: unknown, site: string) =>
   err instanceof Error && err.message === 'not-found'
-    ? `${site} couldn't find that profile — check the name, and that the profile is public.`
+    ? site === 'Goodreads'
+      ? 'Goodreads hides your shelves from visitors. Paste the RSS link from My Books instead (see the note below).'
+      : `${site} couldn't find that profile — check the name, and that the profile is public.`
     : `Couldn't reach ${site} right now. It'll try again later.`;
 
 async function syncLetterboxd(user: string): Promise<SourceResult> {
@@ -88,12 +100,13 @@ async function syncLetterboxd(user: string): Promise<SourceResult> {
   }
 }
 
-async function syncGoodreads(id: string): Promise<SourceResult> {
+async function syncGoodreads(id: string, key?: string): Promise<SourceResult> {
   try {
     // Read first, so a book on two shelves counts as read.
     const shelves: GoodreadsShelf[] = ['read', 'currently-reading', 'to-read'];
     const rows = [];
-    for (const shelf of shelves) rows.push(...parseGoodreadsFeed(await fetchFeed(`source=goodreads&user=${id}&shelf=${shelf}`), shelf));
+    const auth = key ? `&key=${encodeURIComponent(key)}` : '';
+    for (const shelf of shelves) rows.push(...parseGoodreadsFeed(await fetchFeed(`source=goodreads&user=${id}&shelf=${shelf}${auth}`), shelf));
     const plan = planGoodreadsImport(rows, (await getLifeItems('book')) as BookItem[]);
     const added = plan.creates.length ? await bulkCreateLifeItems(plan.creates) : 0;
     const updated = await bulkUpdateLifeItems(plan.updates);
@@ -112,7 +125,7 @@ export function syncFeeds(): Promise<FeedSyncResult | null> {
     if (!accounts.letterboxd && !accounts.goodreadsId) return null;
     const result: FeedSyncResult = { at: new Date().toISOString() };
     if (accounts.letterboxd) result.letterboxd = await syncLetterboxd(accounts.letterboxd);
-    if (accounts.goodreadsId) result.goodreads = await syncGoodreads(accounts.goodreadsId);
+    if (accounts.goodreadsId) result.goodreads = await syncGoodreads(accounts.goodreadsId, accounts.goodreadsKey);
     try {
       localStorage.setItem(LAST_KEY, JSON.stringify(result));
     } catch {
