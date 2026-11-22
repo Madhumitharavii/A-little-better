@@ -333,12 +333,21 @@ export interface ImportPlan {
 export function planImport(exp: LetterboxdExport, existingMovies: MovieItem[]): ImportPlan {
   const existing = new Map<string, MovieItem>();
   for (const m of existingMovies) if (!m.deletedAt) existing.set(filmKey(m.title, m.year), m);
+  // Films you added yourself without a year: matched on title alone, when that title is unique.
+  const yearless = new Map<string, MovieItem | null>();
+  for (const m of existingMovies) {
+    if (m.deletedAt || m.year) continue;
+    const k = filmKey(m.title);
+    yearless.set(k, yearless.has(k) ? null : m);
+  }
+  const titleCount = new Map<string, number>();
+  for (const f of exp.films) titleCount.set(filmKey(f.title), (titleCount.get(filmKey(f.title)) ?? 0) + 1);
 
   const creates: NewMovieInput[] = [];
   const updates: ImportPlan['updates'] = [];
   let unchanged = 0;
   for (const f of exp.films) {
-    const match = existing.get(f.key);
+    const match = existing.get(f.key) ?? (titleCount.get(filmKey(f.title)) === 1 ? yearless.get(filmKey(f.title)) ?? undefined : undefined);
     if (!match) creates.push(filmToNewMovie(f));
     else {
       const patch = mergeFilmIntoExisting(match, f);

@@ -1,3 +1,6 @@
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+
 interface ConfirmInlineProps {
   title: string;
   description?: string;
@@ -13,7 +16,18 @@ export default function ConfirmInline({
   onConfirm,
   onCancel,
 }: ConfirmInlineProps) {
-  return (
+  // Escape cancels just this question (not the dialog underneath it).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopImmediatePropagation();
+      onCancel();
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [onCancel]);
+
+  return createPortal(
     <div className="fixed inset-0 z-[60] bg-sand-900/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-sand-200 space-y-4">
         <h3 className="serif text-lg font-semibold text-sand-900">{title}</h3>
@@ -27,6 +41,7 @@ export default function ConfirmInline({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -36,9 +36,16 @@ function keyFor(table: string, row: Row) {
   return table === 'settings' ? `${row.user_id}:${row.id}` : row.id;
 }
 
-/** Writes a row as if another device pushed it (server assigns synced_at). */
+/** Writes a row as if another device pushed it (server assigns synced_at). Like the real
+ *  database, care entries / reflections are unique per (user, date[, item]): a row with the
+ *  same natural key but a new id REPLACES the existing one (the app upserts on that key). */
 function remoteUpsert(table: string, row: Row) {
-  remote.table(table).set(keyFor(table, row), { ...row, synced_at: remote.serverNow() });
+  const t = remote.table(table);
+  const natural = (r: Row) =>
+    table === 'care_entries' ? `${r.user_id}|${r.date}|${r.item_key}` : table === 'daily_reflections' ? `${r.user_id}|${r.date}` : null;
+  const key = natural(row);
+  if (key) for (const [k, existing] of t) if (natural(existing) === key && k !== keyFor(table, row)) t.delete(k);
+  t.set(keyFor(table, row), { ...row, synced_at: remote.serverNow() });
 }
 
 vi.mock('@/lib/supabaseClient', () => ({ isSupabaseConfigured: true, supabase: null }));
@@ -51,6 +58,12 @@ vi.mock('@/lib/sync/syncService', () => ({
   pullRowsSince: async (table: string, userId: string, since?: string) =>
     [...remote.table(table).values()].filter(
       (row) => row.user_id === userId && (!since || Date.parse(row.synced_at as string) > Date.parse(since)),
+    ),
+  fetchRemoteStamps: async (table: string, userId: string, ids: string[]) =>
+    new Map(
+      [...remote.table(table).values()]
+        .filter((row) => row.user_id === userId && ids.includes(row.id as string))
+        .map((row) => [row.id as string, row.updated_at as string]),
     ),
   softDeleteRow: async (table: string, id: string, deletedAt: string) => {
     const row = remote.table(table).get(id);
@@ -167,9 +180,10 @@ describe('same item ticked on two devices', () => {
     const local = await db.careEntries.where('[date+itemKey]').equals(['2026-11-21', 'bathed']).toArray();
     expect(local.map((c) => c.id)).toEqual(['phone']);
 
-    await syncOk(); // pushes the removal of this device's duplicate
-    expect(remote.table('care_entries').get('mac')?.deleted_at).toBeTruthy();
-    expect(remote.table('care_entries').get('phone')?.deleted_at).toBeFalsy();
+    await syncOk();
+    // The database allows one row per day + item: the account holds just the newer one.
+    const cloud = [...remote.table('care_entries').values()].filter((r) => r.date === '2026-11-21' && r.item_key === 'bathed');
+    expect(cloud.map((r) => [r.id, !!r.deleted_at])).toEqual([['phone', false]]);
   });
 });
 
@@ -189,6 +203,49 @@ describe('clocks', () => {
     const before = (await getSettings()).updatedAt;
     await saveSyncBookkeeping({ lastSyncedAt: iso('2030-01-01T00:00:00Z') });
     expect((await getSettings()).updatedAt).toBe(before);
+  });
+});
+
+describe('found in the full audit', () => {
+  it('re-ticking an item after un-ticking it keeps syncing (no clash with the one-per-day rule)', async () => {
+    await db.careEntries.put(care('c1', '2026-11-21', 'bathed', iso('2026-11-21T09:00:00Z')));
+    await syncOk();
+    await clearCareEntry('2026-11-21', 'bathed'); // un-tick
+    await db.careEntries.put(care('c2', '2026-11-21', 'bathed', new Date().toISOString())); // re-tick now → new id
+    await syncOk();
+    const rows = [...remote.table('care_entries').values()].filter((r) => r.date === '2026-11-21' && r.item_key === 'bathed');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: 'c2', deleted_at: null });
+  });
+
+  it("the same day's reflection written on two devices is combined, not rejected or lost", async () => {
+    remoteUpsert('daily_reflections', mapping.dailyReflectionToRemote({ id: 'phone', date: '2026-11-21', gratitude: 'Morning coffee', createdAt: iso('2026-11-21T08:00:00Z'), updatedAt: iso('2026-11-21T08:00:00Z') }, USER, 'phone'));
+    await db.dailyReflections.put({ id: 'mac', date: '2026-11-21', eveningGoodThing: 'A long walk', createdAt: iso('2026-11-21T20:00:00Z'), updatedAt: iso('2026-11-21T20:00:00Z') });
+    await syncOk();
+    await syncOk();
+    const local = await db.dailyReflections.where('date').equals('2026-11-21').toArray();
+    expect(local).toHaveLength(1);
+    expect(local[0]).toMatchObject({ gratitude: 'Morning coffee', eveningGoodThing: 'A long walk' });
+    const cloud = [...remote.table('daily_reflections').values()].filter((r) => r.date === '2026-11-21');
+    expect(cloud).toHaveLength(1);
+    expect(cloud[0]).toMatchObject({ gratitude: 'Morning coffee', evening_good_thing: 'A long walk' });
+  });
+
+  it('an older offline edit never overwrites a newer version already in the account', async () => {
+    remoteUpsert('journal_entries', mapping.journalEntryToRemote(journal('j1', 'Newer, from the Mac', iso('2026-11-21T11:00:00Z')), USER, 'mac'));
+    await db.journalEntries.put(journal('j1', 'Older, edited offline on the phone', iso('2026-11-21T10:00:00Z')));
+    await syncOk();
+    expect(remote.table('journal_entries').get('j1')?.body).toBe('Newer, from the Mac');
+    expect((await db.journalEntries.get('j1'))?.body).toBe('Newer, from the Mac');
+  });
+
+  it("a new device's default settings never reset the settings already in the account", async () => {
+    remoteUpsert('settings', mapping.settingsToRemote({ ...(await getSettings()), theme: 'dark', nightReminderEnabled: true, updatedAt: iso('2026-11-20T10:00:00Z') }, USER, 'mac'));
+    await syncOk();
+    const s = await getSettings();
+    expect(s.theme).toBe('dark');
+    expect(s.nightReminderEnabled).toBe(true);
+    expect([...remote.table('settings').values()][0]).toMatchObject({ theme: 'dark' });
   });
 });
 

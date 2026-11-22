@@ -52,9 +52,13 @@ export function subscribeHistory(listener: (history: AdvisorHistory) => void): (
   };
 }
 
+let lastSaved = '';
 export function saveHistory(history: AdvisorHistory): void {
+  const json = JSON.stringify(history);
+  if (json === lastSaved) return; // nothing new — don't write or wake listeners
+  lastSaved = json;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    localStorage.setItem(STORAGE_KEY, json);
   } catch {
     // Not saved — fine.
   }
@@ -155,7 +159,9 @@ export function chooseToday(candidates: Insight[], history: AdvisorHistory, toda
     const kept = history.today.keys
       .map((k) => byKey.get(k))
       .filter((c): c is Insight => !!c && !(history.dismissed[c.rule] && daysBetween(history.dismissed[c.rule], today) < DISMISS_DAYS));
-    if (kept.length > 0 || candidates.length === 0) return { picks: kept, history };
+    // Today's picks were already made: keep them (even if fewer now apply) — never pick more,
+    // so it really is at most MAX_PER_DAY a day. "Not helpful" clears today's picks to allow a swap.
+    return { picks: kept, history };
   }
 
   const fresh = candidates.filter((c) => !isResting(c, history, today));
@@ -172,9 +178,20 @@ export function chooseToday(candidates: Insight[], history: AdvisorHistory, toda
   picks.splice(MAX_PER_DAY);
   picks.sort((a, b) => b.priority - a.priority);
 
+  // Nothing changed (e.g. every insight is resting and today's empty picks are already recorded):
+  // return the SAME history object, so callers don't save it again — saving it again re-runs
+  // this and, before this check, looped forever.
+  const keys = picks.map((p) => p.key);
+  const unchanged =
+    history.today?.date === today &&
+    history.today.keys.length === keys.length &&
+    history.today.keys.every((k, i) => k === keys[i]) &&
+    picks.every((p) => history.shown[p.key]?.date === today && history.shown[p.key]?.fingerprint === p.fingerprint);
+  if (unchanged) return { picks, history };
+
   const shown = { ...history.shown };
   for (const p of picks) shown[p.key] = { date: today, fingerprint: p.fingerprint };
-  return { picks, history: { ...history, shown, today: { date: today, keys: picks.map((p) => p.key) } } };
+  return { picks, history: { ...history, shown, today: { date: today, keys } } };
 }
 
 /** "Not helpful": quiet this kind of advice for a month. */

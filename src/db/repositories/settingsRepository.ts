@@ -15,9 +15,14 @@ function buildDefaultSettings(): AppSettings {
     morningReminderEnabled: false,
     morningReminderTime: '07:00',
     createdAt: timestamp,
-    updatedAt: timestamp,
+    // "Oldest possible": a fresh install's defaults must never look newer than the
+    // settings already in your account (that used to reset settings on every device
+    // when a new device signed in). The first real change gives it a real time.
+    updatedAt: DEFAULTS_UPDATED_AT,
   };
 }
+
+export const DEFAULTS_UPDATED_AT = '1970-01-01T00:00:00.000Z';
 
 /**
  * Pure read. Never writes to the database — this is what makes it

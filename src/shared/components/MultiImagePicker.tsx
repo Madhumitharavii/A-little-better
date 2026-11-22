@@ -75,7 +75,7 @@ export default function MultiImagePicker({ imageIds, onChange, max }: MultiImage
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="w-20 h-20 shrink-0 rounded-2xl border border-dashed border-sand-300 hover:border-sand-400 bg-sand-50 flex items-center justify-center text-sand-800/60 text-xs"
+            className="w-20 h-20 shrink-0 rounded-2xl border border-dashed border-sand-300 hover:border-sand-800/40 bg-sand-50 flex items-center justify-center text-sand-800/60 text-xs"
           >
             {uploading ? '…' : '+ Add'}
           </button>

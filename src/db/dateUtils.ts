@@ -14,6 +14,18 @@ export function getLocalDateKey(d: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * The LOCAL date of a stored timestamp (e.g. createdAt). A plain `.slice(0, 10)` of an ISO
+ * timestamp gives the UTC date — in India that's the previous day for anything done
+ * between midnight and 5:30 am. Date-only keys ("2026-11-22") are returned as they are.
+ */
+export function localDateKeyOf(iso: string | undefined | null): string | undefined {
+  if (!iso) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso.slice(0, 10) : getLocalDateKey(d);
+}
+
 export function addDays(dateKey: string, delta: number): string {
   const [y, m, d] = dateKey.split('-').map(Number);
   const dt = new Date(y, m - 1, d);

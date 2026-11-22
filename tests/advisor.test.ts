@@ -116,3 +116,17 @@ describe('not repeating', () => {
     expect(later.picks.some((p) => p.rule === 'scrolling')).toBe(true);
   });
 });
+
+describe('advice history settles (no endless re-saving)', () => {
+  it('returns the same history when every insight is resting and today is already recorded', async () => {
+    const { chooseToday, emptyHistory } = await import('@/features/advisor/select');
+    const insight = { key: 'k', rule: 'r', kind: 'nudge' as const, priority: 1, icon: '•', message: 'm', because: 'b', fingerprint: 'f' };
+    const restingHistory = { ...emptyHistory(), shown: { k: { date: '2026-11-20', fingerprint: 'f' } } };
+    const first = chooseToday([insight], restingHistory, '2026-11-22');
+    expect(first.picks).toEqual([]);
+    const second = chooseToday([insight], first.history, '2026-11-22');
+    expect(second.history).toBe(first.history);
+    const third = chooseToday([insight], second.history, '2026-11-22');
+    expect(third.history).toBe(first.history);
+  });
+});

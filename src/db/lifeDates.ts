@@ -1,4 +1,5 @@
 import type { LifeItem } from './schema';
+import { localDateKeyOf } from './dateUtils';
 
 /** Pure date helpers for life items (no database access, so the advisor can use them too). */
 
@@ -16,7 +17,7 @@ export const isWishlistItem = (item: LifeItem) => isWatchlistMovie(item) || (ite
  * of reading and watching. Want-to-read and watchlist items have none.
  */
 export function lifeItemActivityDates(item: LifeItem): string[] {
-  const created = item.createdAt.slice(0, 10);
+  const created = localDateKeyOf(item.createdAt) ?? String(item.createdAt).slice(0, 10);
   switch (item.type) {
     case 'book': {
       if (item.status === 'wantTo') return [];

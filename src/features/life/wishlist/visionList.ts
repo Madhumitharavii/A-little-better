@@ -19,13 +19,15 @@ export function parseVisionList(text: string): VisionLine[] {
   for (const raw of text.split(/\r?\n/)) {
     let line = raw.trim();
     if (!line) continue;
-    if (/^#+\s*/.test(line) || (line.endsWith(':') && line.length <= 40)) {
+    // Headings: "# Learning" (a # then a space and a word — not "#1 Run a 5k") or "Learning:".
+    if (/^#+\s+\D/.test(line) || (line.endsWith(':') && line.length <= 40)) {
       category = line.replace(/^#+\s*/, '').replace(/:$/, '').trim() || undefined;
       continue;
     }
     line = line.replace(/^([-*•·]|\d+[.)])\s+/, '');
     let done = false;
-    const mark = line.match(/^(\[[xX✓]\]|[✓✔✅]|[xX]\s)\s*/);
+    // Only clear checkbox marks — not a leading "X" (that would eat "X Factor audition").
+    const mark = line.match(/^(\[[xX✓]\]|[✓✔✅])\s*/);
     if (mark) {
       done = true;
       line = line.slice(mark[0].length);
@@ -51,11 +53,20 @@ export function newVisionLines(lines: VisionLine[], existing: WishItem[], year: 
 
 /** "Read 12 books" → 12 — a reading goal the app can track from Books. */
 export function readingGoalTarget(title: string): number | null {
+  // "Read 1 book a month / per week" is a pace, not a yearly total.
+  if (/\bbooks?\s+(a|per|each|every)\s+(day|week|month)\b/i.test(title)) return null;
   const m = title.match(/\bread\b[^\d]{0,20}(\d{1,4})\s+books?\b/i) ?? title.match(/^(\d{1,4})\s+books?\b/i);
   return m ? Number(m[1]) : null;
 }
 
-/** Books finished in a given year. */
+/** Readings finished in a given year — the current one plus earlier readings (so a reread never lowers the count). */
 export function booksFinishedIn(books: BookItem[], year: number): number {
-  return books.filter((b) => !b.deletedAt && b.status === 'finished' && b.dateFinished?.startsWith(String(year))).length;
+  const y = String(year);
+  let count = 0;
+  for (const b of books) {
+    if (b.deletedAt) continue;
+    if (b.status === 'finished' && b.dateFinished?.startsWith(y)) count++;
+    for (const r of b.previousReadings ?? []) if (r.status === 'finished' && r.dateFinished?.startsWith(y)) count++;
+  }
+  return count;
 }

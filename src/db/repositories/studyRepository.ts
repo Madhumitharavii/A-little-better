@@ -99,7 +99,7 @@ export async function moveTopic(subjectId: string, topicId: string, direction: -
 
 // ── sessions ──
 
-export async function logStudySession(input: { subject: SubjectItem; topicId?: string; minutes: number; date?: string; note?: string }): Promise<StudySessionItem> {
+export async function logStudySession(input: { subject: SubjectItem; topicId?: string; minutes: number; date?: string; note?: string; fromFocus?: boolean }): Promise<StudySessionItem> {
   const timestamp = nowIso();
   const topic = input.subject.topics.find((t) => t.id === input.topicId);
   const session: StudySessionItem = {
@@ -111,6 +111,7 @@ export async function logStudySession(input: { subject: SubjectItem; topicId?: s
     date: input.date ?? getLocalDateKey(),
     minutes: input.minutes,
     notes: input.note?.trim() || undefined,
+    fromFocus: input.fromFocus || undefined,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -207,6 +208,26 @@ export async function mergeDuplicateSubjects(): Promise<number> {
     }
     writes.push({ ...kept, updatedAt: now });
   }
+  // Sessions still pointing at a subject that was merged away elsewhere (e.g. logged on
+  // another device before it heard about the merge): move them to the live subject with
+  // the same name, so their minutes aren't lost.
+  const liveByTitle = new Map<string, SubjectItem>();
+  for (const [key, group] of groups) {
+    const keep = [...group].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)) || a.id.localeCompare(b.id))[0];
+    liveByTitle.set(key, keep);
+  }
+  const deletedSubjects = (rows.filter((r) => r.type === 'subject' && r.deletedAt) as unknown as SubjectItem[]).filter((d) => !subjects.some((s) => s.id === d.id));
+  const repointed = new Set(writes.filter((w) => w.type === 'studySession').map((w) => w.id));
+  for (const gone of deletedSubjects) {
+    const target = liveByTitle.get(gone.title.trim().toLowerCase());
+    if (!target) continue;
+    for (const session of sessions.filter((x) => x.subjectId === gone.id && !repointed.has(x.id))) {
+      const topic = gone.topics?.find((t) => t.id === session.topicId);
+      const mapped = topic ? target.topics.find((t) => t.name.trim().toLowerCase() === topic.name.trim().toLowerCase())?.id : undefined;
+      writes.push({ ...session, subjectId: target.id, topicId: mapped, updatedAt: now });
+    }
+  }
+
   if (writes.length) await table().bulkPut(writes);
   return merged;
 }

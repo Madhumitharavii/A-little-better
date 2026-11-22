@@ -83,3 +83,16 @@ describe('Flo import', () => {
     expect(dayKey('soon')).toBeUndefined();
   });
 });
+
+describe('cycle CSV dates', () => {
+  it('reads day-first dates as written in India, and checks CSV rows like Flo ones', async () => {
+    const { parseDayFirst } = await import('@/features/me/period/periodImport');
+    expect(parseDayFirst('05/03/2024')).toBe('2024-03-05');
+    expect(parseDayFirst('15/03/2024')).toBe('2024-03-15');
+    expect(parseDayFirst('03/25/2024')).toBe('2024-03-25');
+    expect(parseDayFirst('31/02/2024')).toBeUndefined();
+    const csv = parseCycleFile('Start Date,End Date\n05/03/2026,09/03/2026\n20/12/2026,24/12/2026', '2026-11-22');
+    expect(csv.periods).toEqual([{ startDate: '2026-03-05', endDate: '2026-03-09' }]);
+    expect(csv.adjustments['Predicted future periods, skipped']).toBe(1);
+  });
+});

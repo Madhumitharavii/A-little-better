@@ -1,3 +1,4 @@
+import { getLocalDateKey } from '@/db/dateUtils';
 import { useState } from 'react';
 import Modal, { ModalHeader } from '@/shared/components/Modal';
 import StarRating from '@/shared/components/StarRating';
@@ -37,7 +38,7 @@ export default function BookEditorModal({ existing, onClose, onSave }: BookEdito
       author: author.trim() || undefined,
       status,
       coverImageId,
-      dateAdded: existing?.dateAdded ?? new Date().toISOString().slice(0, 10),
+      dateAdded: existing?.dateAdded ?? getLocalDateKey(),
       dateStarted: dateStarted || undefined,
       dateFinished: dateFinished || undefined,
       rating,

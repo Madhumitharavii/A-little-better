@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLifeItemsOfType } from '../useLifeItems';
 import { createLifeItem, updateLifeItem, toggleFavorite, deleteLifeItem, logBookReread } from '@/db/repositories/lifeRepository';
 import type { BookItem } from '@/db/schema';
+import { compareTitles } from '@/shared/utils/collate';
 import BookCard from './BookCard';
 import BookEditorModal from './BookEditorModal';
 import BookDetailModal from './BookDetailModal';
@@ -19,7 +20,7 @@ const PAGE = 60;
 /** Most recently finished first; then by title (numbers in order). */
 const byLatest = (a: BookItem, b: BookItem) =>
   (b.dateFinished ?? b.dateStarted ?? '').localeCompare(a.dateFinished ?? a.dateStarted ?? '') ||
-  a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
+  compareTitles(a.title, b.title);
 
 export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksPageProps) {
   const books = useLifeItemsOfType('book') as BookItem[];
@@ -29,6 +30,7 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
   const [detail, setDetail] = useState<BookItem | null>(initialOpenItem ?? null);
   const [importing, setImporting] = useState(false);
   const [shelf, setShelf] = useState<string | null>(null);
+  const sortedBooks = useMemo(() => [...books].sort(byLatest), [books]);
   const [visible, setVisible] = useState(PAGE);
 
   useEffect(() => setVisible(PAGE), [tab, query, shelf]);
@@ -55,7 +57,7 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
   }, [initialOpenItem]);
 
   const filtered = useMemo(() => {
-    let list = [...books].sort(byLatest);
+    let list = sortedBooks;
     if (tab === 'all') list = list.filter((b) => b.status !== 'wantTo');
     else if (tab === 'favorites') list = list.filter((b) => b.favorite);
     else if (tab === 'shelves') list = shelf ? list.filter((b) => b.shelves?.includes(shelf)) : [];
@@ -64,7 +66,7 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((b) => b.title.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q));
     return list;
-  }, [books, tab, query, shelf]);
+  }, [sortedBooks, tab, query, shelf]);
 
   return (
     <div className="space-y-5">

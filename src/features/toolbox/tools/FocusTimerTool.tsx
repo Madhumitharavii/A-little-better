@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Modal, { ModalHeader } from '@/shared/components/Modal';
 import type { SubjectItem } from '@/db/schema';
 import { useSubjects } from '@/features/study/useStudy';
@@ -29,6 +29,15 @@ export default function FocusTimerTool({ onClose, onComplete }: FocusTimerToolPr
   const [topicId, setTopicId] = useState<string>('');
   const subject = subjects.find((s) => s.id === subjectId);
   const focusFor: FocusFor | undefined = subject ? { subject, topicId: topicId || undefined } : undefined;
+  // Finishing happens exactly once (a re-render mid-save used to log the session twice).
+  const finished = useRef(false);
+  const finish = (minutes: number) => {
+    if (finished.current) return;
+    finished.current = true;
+    setIsRunning(false);
+    onComplete(minutes, focusFor);
+  };
+  const elapsedMinutes = Math.round((durationMinutes * 60 - timeLeft) / 60);
 
   const selectMinutes = (mins: number) => {
     setDurationMinutes(mins);
@@ -44,9 +53,9 @@ export default function FocusTimerTool({ onClose, onComplete }: FocusTimerToolPr
 
   useEffect(() => {
     if (isRunning && timeLeft === 0) {
-      onComplete(durationMinutes, focusFor);
+      finish(durationMinutes);
     }
-  }, [isRunning, timeLeft, durationMinutes, onComplete]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isRunning, timeLeft, durationMinutes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-sm">
@@ -120,7 +129,7 @@ export default function FocusTimerTool({ onClose, onComplete }: FocusTimerToolPr
           {isRunning ? 'Pause' : 'Start Focus'}
         </button>
         <button
-          onClick={() => onComplete(Math.max(1, Math.round((durationMinutes * 60 - timeLeft) / 60)), focusFor)}
+          onClick={() => (elapsedMinutes > 0 ? finish(elapsedMinutes) : onClose())}
           className="px-4 py-2.5 bg-sand-100 text-sand-800 hover:bg-sand-200 text-xs font-semibold rounded-2xl"
         >
           Log & Wrap Up

@@ -309,6 +309,8 @@ export interface SubjectItem extends LifeItemBase {
 
 export interface StudySessionItem extends LifeItemBase {
   type: 'studySession';
+  /** Logged by the Today focus timer — those minutes are already in the care "focus" total. */
+  fromFocus?: boolean;
   subjectId: string;
   topicId?: string;
   /** Local date key of the session, e.g. "2026-11-21". */

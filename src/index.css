@@ -84,6 +84,20 @@
 .dark .border-slate-300 { border-color: rgb(70 75 90); }
 .dark .border-slate-400 { border-color: rgb(95 101 118); }
 .dark .text-slate-700 { color: rgb(205 208 226); }
+.dark .hover\:bg-slate-200\/80:hover { background-color: rgb(52 56 68 / 0.8); }
+.dark .hover\:bg-amber-50\/70:hover { background-color: rgb(58 44 20 / 0.7); }
+.dark .bg-amber-100 { background-color: rgb(72 54 22); }
+.dark .text-amber-800 { color: rgb(245 196 110); }
+
+/* Coloured buttons with white text: in dark mode these fills are lightened, so the
+   text switches to the dark ink colour to stay readable (white on light was ~2:1). */
+.dark .text-white.bg-sage-500,
+.dark .text-white.bg-terracotta-400,
+.dark .text-white.bg-terracotta-600,
+.dark .text-white.hover\:bg-sage-700:hover,
+.dark .text-white.hover\:bg-terracotta-600:hover {
+  color: rgb(var(--c-sand-50));
+}
 
 html {
   /* Prevents iOS Safari/PWA from auto-zooming on input focus when

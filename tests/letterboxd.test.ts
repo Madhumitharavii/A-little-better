@@ -145,3 +145,12 @@ describe('activity dates (what counts as "this week")', () => {
     expect(lifeItemActivityDates({ ...base, type: 'movie' } as MovieItem)).toEqual(['2026-11-21']);
   });
 });
+
+describe('matching a film you added without a year (from the audit)', () => {
+  it('updates your own yearless "Dune" instead of adding a second one', () => {
+    const exp = parseLetterboxdExport([{ path: 'x/watched.csv', text: 'Date,Name,Year,Letterboxd URI\n2024-01-01,Dune,2021,https://boxd.it/d' }]);
+    const mine = { id: 'm', type: 'movie', title: 'Dune', status: 'watched', createdAt: 'x', updatedAt: 'x' } as MovieItem;
+    const plan = planImport(exp, [mine]);
+    expect(plan.creates).toHaveLength(0);
+  });
+});

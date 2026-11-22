@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db/db';
 import Modal, { ModalHeader } from '@/shared/components/Modal';
 import type { WishItem } from '@/db/schema';
 import { createLifeItem, updateLifeItem } from '@/db/repositories/lifeRepository';
@@ -22,7 +24,17 @@ export default function AchievedStoryModal({ wish, mode, onClose, onDone }: Achi
   const today = getLocalDateKey();
   const [date, setDate] = useState(wish.dateCompleted ?? today);
   const [story, setStory] = useState(wish.story ?? '');
-  const [toJournal, setToJournal] = useState(!wish.linkedJournalId);
+  // Links still pointing at something that exists (a journal entry or experience you've since deleted doesn't count).
+  const links = useLiveQuery(async () => {
+    const [j, e] = await Promise.all([
+      wish.linkedJournalId ? db.journalEntries.get(wish.linkedJournalId) : undefined,
+      wish.linkedExperienceId ? db.lifeItems.get(wish.linkedExperienceId) : undefined,
+    ]);
+    return { journal: j && !j.deletedAt ? j.id : undefined, experience: e && !e.deletedAt ? e.id : undefined };
+  }, [wish.linkedJournalId, wish.linkedExperienceId]);
+  const journalId = links?.journal;
+  const experienceId = links?.experience;
+  const [toJournal, setToJournal] = useState(true); // only offered when there is no live journal link
   const [toExperience, setToExperience] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -36,20 +48,27 @@ export default function AchievedStoryModal({ wish, mode, onClose, onDone }: Achi
 
   const save = async () => {
     setBusy(true);
-    const patch: Partial<WishItem> = { done: true, dateCompleted: date, story: text || undefined };
+    const patch: Partial<WishItem> = {
+      done: true,
+      dateCompleted: date,
+      story: text || undefined,
+      // Forget links to things that were deleted, so they can be made again.
+      linkedJournalId: journalId,
+      linkedExperienceId: experienceId,
+    };
     const saved: string[] = [];
 
-    if (text) {
-      if (wish.linkedJournalId) {
-        await updateJournalEntry(wish.linkedJournalId, { body: text, date });
-      } else if (toJournal) {
+    if (journalId) {
+      await updateJournalEntry(journalId, text ? { body: text, date } : { date });
+    } else if (text) {
+      if (toJournal) {
         const entry = await saveJournalEntry({ date, title: wish.title, body: text, tags: ['vision'] });
         patch.linkedJournalId = entry.id;
         saved.push('your journal');
       }
     }
-    if (wish.linkedExperienceId) {
-      if (text) await updateLifeItem(wish.linkedExperienceId, { type: 'experience', description: text, date });
+    if (experienceId) {
+      await updateLifeItem(experienceId, text ? { type: 'experience', description: text, date } : { type: 'experience', date });
     } else if (toExperience) {
       const exp = await createLifeItem({ type: 'experience', title: wish.title, description: text || wish.notes, date, favorite: wish.favorite });
       patch.linkedExperienceId = exp.id;
@@ -99,7 +118,7 @@ export default function AchievedStoryModal({ wish, mode, onClose, onDone }: Achi
         </div>
 
         <div className="space-y-2">
-          {wish.linkedJournalId ? (
+          {journalId ? (
             <p className="text-sand-800/60">📓 Already in your journal{text ? ', it will be updated' : ''}.</p>
           ) : (
             <label className={`flex items-center gap-2 ${text ? 'cursor-pointer' : 'opacity-50'}`}>
@@ -107,7 +126,7 @@ export default function AchievedStoryModal({ wish, mode, onClose, onDone }: Achi
               <span>📓 Save the story in my Journal{!text ? ' (write a few words first)' : ''}</span>
             </label>
           )}
-          {wish.linkedExperienceId ? (
+          {experienceId ? (
             <p className="text-sand-800/60">🌿 Already in Life → Experiences{text ? ', it will be updated' : ''}.</p>
           ) : (
             <label className="flex items-center gap-2 cursor-pointer">

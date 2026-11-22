@@ -1,3 +1,4 @@
+import { localDateKeyOf } from '@/db/dateUtils';
 import type { DailyReflection, JournalEntry, LifeItem, StudySessionItem } from '@/db/schema';
 
 /**
@@ -22,7 +23,7 @@ export interface AiDocument {
 
 const MIN_CHARS = 12;
 const join = (...parts: (string | undefined | null)[]) => parts.filter((p) => p && p.trim()).join('. ').trim();
-const keyOf = (iso: string) => iso.slice(0, 10);
+const keyOf = (iso: string) => localDateKeyOf(iso) ?? iso.slice(0, 10);
 
 export function collectDocuments(input: {
   journal: JournalEntry[];

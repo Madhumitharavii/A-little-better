@@ -32,3 +32,19 @@ describe('vision board: add several', () => {
     expect(booksFinishedIn([b('finished', '2026-03-01'), b('finished', '2025-12-31'), b('didNotFinish', '2026-04-01'), b('wantTo')], 2026)).toBe(1);
   });
 });
+
+describe('vision paste edge cases (from the audit)', () => {
+  it('keeps "#1 …" and "X …" goals as goals, and ignores reading paces', () => {
+    const lines = parseVisionList('# Fun\n#1 Run a 5k\nX Factor audition\n[x] Already done');
+    expect(lines).toEqual([
+      { title: '#1 Run a 5k', category: 'Fun', done: false },
+      { title: 'X Factor audition', category: 'Fun', done: false },
+      { title: 'Already done', category: 'Fun', done: true },
+    ]);
+    expect(readingGoalTarget('Read 1 book a month')).toBeNull();
+  });
+  it('counts rereads finished this year', () => {
+    const book = { id: 'a', type: 'book', title: 'A', status: 'inProgress', previousReadings: [{ id: 'r', status: 'finished', dateFinished: '2026-03-01' }], createdAt: 'x', updatedAt: 'x' } as BookItem;
+    expect(booksFinishedIn([book], 2026)).toBe(1);
+  });
+});

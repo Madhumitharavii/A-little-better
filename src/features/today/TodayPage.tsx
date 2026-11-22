@@ -95,7 +95,10 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
         <CareForMeSection
           findEntry={(key) => findEntry(key as CareItemKey)}
           onToggleDone={(key) => {
-            toggleDone(key as CareItemKey);
+            if (!toggleDone(key as CareItemKey)) {
+              showToast('Your minutes stay logged for today, so this stays ticked.');
+              return;
+            }
             chime();
           }}
           onRequestSkip={(key) => setSkipTarget(key as CareItemKey)}
@@ -183,7 +186,7 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
           onClose={closeTool}
           onComplete={async (mins, focusFor) => {
             addMinutes('focus', mins);
-            if (focusFor) await logStudySession({ subject: focusFor.subject, topicId: focusFor.topicId, minutes: mins });
+            if (focusFor) await logStudySession({ subject: focusFor.subject, topicId: focusFor.topicId, minutes: mins, fromFocus: true });
             chime();
             showToast(
               focusFor

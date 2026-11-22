@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useLifeRows } from '@/db/lifeStore';
+import { getLifeRows, useLifeRows } from '@/db/lifeStore';
 import { db } from '@/db/db';
 import { getLocalDateKey } from '@/db/dateUtils';
 import type { DailyReflection, JournalEntry, LifeItem, StudySessionItem } from '@/db/schema';
@@ -154,8 +154,23 @@ async function sentenceVectors(texts: string[]): Promise<Vector[]> {
   return all.map((r) => r!.vector);
 }
 
+/** Themes only change when journal/reflection text does — cached on a fingerprint of that text. */
+let themeCache: { key: string; themes: JournalTheme[] } | null = null;
+function themesFor(writing: AiDocument[], vectors: Vector[], nameVectors: Vector[], today: string): JournalTheme[] {
+  const key = `${today.slice(0, 7)}|` + writing.map((d) => `${d.key}:${textHash(d.text)}`).join(',');
+  if (themeCache?.key === key) return themeCache.themes;
+  const themes = computeThemes(writing, vectors, nameVectors, THEME_NAMES, today);
+  themeCache = { key, themes };
+  return themes;
+}
+
 async function refreshOnce(): Promise<void> {
-  const [journal, reflections, lifeRows] = await Promise.all([db.journalEntries.toArray(), db.dailyReflections.toArray(), db.lifeItems.toArray()]);
+  // Life rows from the shared copy when it's loaded (no extra full read of the table).
+  const [journal, reflections, lifeRows] = await Promise.all([
+    db.journalEntries.toArray(),
+    db.dailyReflections.toArray(),
+    getLifeRows() ?? db.lifeItems.toArray(),
+  ]);
   const rows = lifeRows as unknown as Array<{ type: string }>;
   docs = collectDocuments({
     journal: journal as JournalEntry[],
@@ -212,7 +227,7 @@ async function refreshOnce(): Promise<void> {
     ready: true,
     indexing: undefined,
     docCount: docs.length,
-    themes: computeThemes(writing, writingVectors, nameVectors, THEME_NAMES, today),
+    themes: themesFor(writing, writingVectors, nameVectors, today),
     emotionCounts: emotionThemeCounts(writing, writingVectors, classify, today),
     emotions,
     weekSummary,

@@ -21,11 +21,32 @@ export interface ParsedPeriodRow {
   endDate?: string;
 }
 
+/**
+ * Day-first wins for slashed/dotted dates ("05/03/2024" = 5 March), as written in India
+ * and most of the world; it's read month-first only when the first number can't be a
+ * day-of-month pairing (e.g. "03/25/2024", where 25 can only be the day).
+ */
+export function parseDayFirst(raw: string): string | undefined {
+  const m = raw.trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
+  if (!m) return undefined;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  const year = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  let day = a;
+  let month = b;
+  if (b > 12 && a <= 12) [day, month] = [b, a]; // only valid month-first
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  const d = new Date(year, month - 1, day);
+  if (d.getMonth() !== month - 1) return undefined; // e.g. 31/02
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 function normalizeDate(raw: string): string | undefined {
   const trimmed = raw.trim();
   if (!trimmed) return undefined;
-  // Accept YYYY-MM-DD directly; otherwise try to parse and reformat.
+  // Accept YYYY-MM-DD directly; DD/MM/YYYY next; otherwise try to parse and reformat.
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const dayFirst = parseDayFirst(trimmed);
+  if (dayFirst) return dayFirst;
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return undefined;
   const y = parsed.getFullYear();

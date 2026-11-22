@@ -10,7 +10,7 @@ const TILES: Array<{ id: ToolId; icon: string; title: string; subtitle: string; 
   { id: 'overthinking', icon: '🌊', title: 'Overthinking', subtitle: 'Fact vs prediction', hoverBorder: 'hover:border-sage-500/40', hoverBg: 'hover:bg-sage-100/30' },
   { id: 'temper', icon: '🕊️', title: 'Temper & Anger', subtitle: 'Pause before acting', hoverBorder: 'hover:border-amber-400/40', hoverBg: 'hover:bg-amber-50' },
   { id: 'selfDoubt', icon: '🧭', title: 'Self-Doubt', subtitle: 'Check evidence', hoverBorder: 'hover:border-slate-400/40', hoverBg: 'hover:bg-slate-100' },
-  { id: 'appearance', icon: '🪞', title: 'Insecurity', subtitle: 'Beyond appearance', hoverBorder: 'hover:border-terracotta-300/40', hoverBg: 'hover:bg-terracotta-50' },
+  { id: 'appearance', icon: '🪞', title: 'Insecurity', subtitle: 'Beyond appearance', hoverBorder: 'hover:border-terracotta-400/40', hoverBg: 'hover:bg-terracotta-100' },
 ];
 
 export default function ToolboxGrid({ openTool }: ToolboxGridProps) {

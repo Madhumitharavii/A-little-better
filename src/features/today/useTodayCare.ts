@@ -1,5 +1,5 @@
+import { useToday } from '@/shared/hooks/useToday';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { getLocalDateKey } from '@/db/dateUtils';
 import {
   getDailyCare,
   saveCareEntry,
@@ -16,7 +16,7 @@ import type { CareEntry, CareItemKey } from '@/db/schema';
  * automatically, so a refresh or app restart can never lose it.
  */
 export function useTodayCare() {
-  const date = getLocalDateKey();
+  const date = useToday();
 
   const careEntries = useLiveQuery(() => getDailyCare(date), [date]) ?? [];
   const reflection = useLiveQuery(() => getDailyReflection(date), [date]);
@@ -31,13 +31,16 @@ export function useTodayCare() {
 
   const clearItem = (itemKey: CareItemKey) => clearCareEntry(date, itemKey);
 
-  const toggleDone = (itemKey: CareItemKey) => {
+  /** Returns false when it refused to untick (reading/focus with minutes logged — unticking would delete them). */
+  const toggleDone = (itemKey: CareItemKey): boolean => {
     const existing = findEntry(itemKey);
     if (existing?.status === 'done') {
+      if ((itemKey === 'reading' || itemKey === 'focus') && (existing.valueMinutes ?? 0) > 0) return false;
       clearItem(itemKey);
     } else {
       markDone(itemKey);
     }
+    return true;
   };
 
   const addMinutes = (itemKey: Extract<CareItemKey, 'reading' | 'focus'>, minutes: number) =>

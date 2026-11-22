@@ -20,6 +20,7 @@ import { mergeDuplicateSubjects } from '@/db/repositories/studyRepository';
 import { subscribePasswordRecovery } from '@/lib/sync/authService';
 import { applyTheme, onSystemThemeChange } from '@/shared/utils/theme';
 import { onOpenLifeItem } from './navigation';
+import { useMediaQuery } from '@/shared/hooks/useMediaQuery';
 
 
 export default function App() {
@@ -131,7 +132,13 @@ export default function App() {
     showToast(next ? 'Subtle chimes enabled 🔔' : 'Sound turned off 🔇');
   };
 
+  // Tapping the section you're already in takes you back to its main page (e.g. Books → Life home).
+  const [resetCount, setResetCount] = useState(0);
+  // Which navigation is showing (sidebar from 768px) — only that one's live pieces mount,
+  // so Noticed for You isn't worked out twice.
+  const isWide = useMediaQuery('(min-width: 768px)');
   const goTo = (tab: TabId) => {
+    if (tab === currentTab) setResetCount((n) => n + 1);
     setCurrentTab(tab);
     setLastTab(tab);
   };
@@ -139,7 +146,7 @@ export default function App() {
   return (
     <div className="min-h-screen md:flex">
       {/* Wider windows (Mac, tablets): navigation in a sidebar on the left. */}
-      <aside className="hidden md:flex flex-col w-52 lg:w-60 shrink-0 h-screen sticky top-0 border-r border-sand-200 px-4 lg:px-5 py-7 gap-7">
+      <aside className="hidden md:flex flex-col w-52 lg:w-60 shrink-0 h-screen sticky top-0 overflow-y-auto border-r border-sand-200 px-4 lg:px-5 py-7 gap-7">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 shrink-0 rounded-2xl bg-terracotta-400/10 flex items-center justify-center text-xl">🍃</div>
           <div className="min-w-0">
@@ -166,10 +173,12 @@ export default function App() {
           })}
         </nav>
 
-        <div className="space-y-2">
-          <NoticedButton />
-          <StudyTimerPill onOpen={() => goTo('week')} />
-        </div>
+        {isWide && (
+          <div className="space-y-2">
+            <NoticedButton />
+            <StudyTimerPill onOpen={() => goTo('week')} />
+          </div>
+        )}
 
         <div className="mt-auto flex flex-col gap-1.5 text-xs">
           <button
@@ -217,8 +226,7 @@ export default function App() {
                   key={tab.id}
                   onClick={() => {
                     if (tab.implemented) {
-                      setCurrentTab(tab.id);
-                      setLastTab(tab.id);
+                      goTo(tab.id);
                     } else {
                       showToast(`The '${tab.label}' sanctuary is being prepared.`);
                     }
@@ -241,15 +249,17 @@ export default function App() {
 
         <div className="mt-4 flex items-center justify-between flex-wrap gap-2 text-[11px] text-sand-800/70 font-medium border-t border-sand-100 pt-3">
           {/* Today's advice from any tab — with a dot when there's something new. */}
-          <NoticedButton />
+          {!isWide && <NoticedButton />}
 
           <div className="flex items-center gap-1.5 flex-wrap">
-            <StudyTimerPill
-              onOpen={() => {
-                setCurrentTab('week');
-                setLastTab('week');
-              }}
-            />
+            {!isWide && (
+              <StudyTimerPill
+                onOpen={() => {
+                  setCurrentTab('week');
+                  setLastTab('week');
+                }}
+              />
+            )}
             <button
               onClick={toggleSound}
               className="text-[11px] text-terracotta-600 hover:text-terracotta-600/80 font-semibold flex items-center gap-1 px-2 py-0.5 rounded-lg bg-terracotta-100/70 transition-colors"
@@ -273,7 +283,7 @@ export default function App() {
 
       <Toast message={toastMessage} />
 
-      <main className="mt-8 md:mt-0">
+      <main className="mt-8 md:mt-0" key={resetCount}>
         {currentTab === 'today' && <TodayPage showToast={showToast} soundEnabled={!!settings?.soundEnabled} />}
         {currentTab === 'week' && <WeekPage showToast={showToast} />}
         {currentTab === 'life' && <LifePage showToast={showToast} openItemId={lifeItemToOpen} onOpenedItem={() => setLifeItemToOpen(null)} />}

@@ -25,7 +25,6 @@ export default defineConfig({
         theme_color: '#FFFFFF',
         background_color: '#FFFFFF',
         display: 'standalone',
-        orientation: 'portrait',
         start_url: '/',
         scope: '/',
         icons: [
@@ -47,64 +46,14 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        // Precache the app's code and icons so it works with no network at all. The page itself
-        // (index.html) is NOT precached: it's fetched network-first below, so when you're online
-        // the app always opens on the newest version — instead of showing an older saved copy
-        // first and then switching (which made the layout flip between versions).
-        globPatterns: ['**/*.{js,css,svg,png,ico}'],
+      // Our own service worker (src/sw.ts): newest page when online, the matching saved
+      // page when offline — see the comment there.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
         globIgnores: ['**/models/**', '**/ort/**'],
-        navigateFallback: null,
-        runtimeCaching: [
-          {
-            // Opening the app: newest page when online; the last saved page when offline or slow.
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'pages',
-              networkTimeoutSeconds: 3,
-              expiration: { maxEntries: 4 },
-              cacheableResponse: { statuses: [200] },
-            },
-          },
-          {
-            // Built code files have unique names per version — keep the ones a saved page may still need.
-            urlPattern: ({ url }) => url.pathname.startsWith('/assets/'),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'app-assets',
-              expiration: { maxEntries: 40 },
-              cacheableResponse: { statuses: [200] },
-            },
-          },
-          {
-            // The on-device AI model and engine, served by the app itself.
-            urlPattern: ({ url }) => url.pathname.startsWith('/models/') || url.pathname.startsWith('/ort/'),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'on-device-ai',
-              expiration: { maxEntries: 12 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-stylesheets',
-              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-webfonts',
-              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
       },
       devOptions: {
         // Lets you test install/offline behavior during `npm run dev` too.

@@ -130,26 +130,46 @@ export function kMeans(vectors: Vector[], k: number, seed = 42, maxIterations = 
  * and b = mean distance to the nearest other cluster. Higher means
  * clusters are tighter and better separated.
  */
-export function silhouette(vectors: Vector[], labels: number[]): number {
+export function silhouette(vectors: Vector[], labels: number[], dist?: Float64Array): number {
   const n = vectors.length;
   const clusters = [...new Set(labels)];
   if (clusters.length < 2) return 0;
-  const dist = vectors.map((a) => vectors.map((b) => cosineDistance(a, b)));
+  const d = dist ?? distanceMatrix(vectors);
+  // Members of each cluster, worked out once (not per point).
+  const members = new Map<number, number[]>();
+  labels.forEach((l, j) => members.set(l, [...(members.get(l) ?? []), j]));
   let total = 0;
   for (let i = 0; i < n; i++) {
     const own = labels[i];
-    const ownMembers = labels.map((l, j) => (l === own && j !== i ? j : -1)).filter((j) => j >= 0);
-    if (ownMembers.length === 0) continue; // singleton contributes 0
-    const a = ownMembers.reduce((s, j) => s + dist[i][j], 0) / ownMembers.length;
+    const ownMembers = members.get(own)!;
+    if (ownMembers.length <= 1) continue; // singleton contributes 0
+    let sumOwn = 0;
+    for (const j of ownMembers) if (j !== i) sumOwn += d[i * n + j];
+    const a = sumOwn / (ownMembers.length - 1);
     let b = Infinity;
-    for (const c of clusters) {
+    for (const [c, ms] of members) {
       if (c === own) continue;
-      const members = labels.map((l, j) => (l === c ? j : -1)).filter((j) => j >= 0);
-      b = Math.min(b, members.reduce((s, j) => s + dist[i][j], 0) / members.length);
+      let sum = 0;
+      for (const j of ms) sum += d[i * n + j];
+      b = Math.min(b, sum / ms.length);
     }
     total += (b - a) / Math.max(a, b);
   }
   return total / n;
+}
+
+/** All pairwise cosine distances, computed once (symmetric, so each pair only once). */
+export function distanceMatrix(vectors: Vector[]): Float64Array {
+  const n = vectors.length;
+  const d = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const v = cosineDistance(vectors[i], vectors[j]);
+      d[i * n + j] = v;
+      d[j * n + i] = v;
+    }
+  }
+  return d;
 }
 
 export interface ClusterChoice extends KMeansResult {
@@ -166,9 +186,10 @@ export function chooseClusters(vectors: Vector[], kMin = 2, kMax = 6, seed = 42)
   const limit = Math.min(kMax, Math.floor(vectors.length / 3));
   if (limit < kMin) return null;
   let best: ClusterChoice | null = null;
+  const dist = distanceMatrix(vectors); // shared by every k
   for (let k = kMin; k <= limit; k++) {
     const result = kMeans(vectors, k, seed);
-    const score = silhouette(vectors, result.labels);
+    const score = silhouette(vectors, result.labels, dist);
     if (!best || score > best.silhouette) best = { ...result, k, silhouette: score };
   }
   return best;

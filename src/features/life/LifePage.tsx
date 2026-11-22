@@ -59,7 +59,7 @@ export default function LifePage({ showToast, openItemId, onOpenedItem }: LifePa
     { view: 'series' as const, icon: '📺', title: 'Series', tagline: "What I've binged", accent: 'bg-slate-100 border-slate-500/30', count: counts.series },
     { view: 'artwork' as const, icon: '🎨', title: 'Artwork', tagline: "What I've made", accent: 'bg-amber-50 border-amber-300/50', count: counts.artwork },
     { view: 'experience' as const, icon: '🌿', title: 'Experiences', tagline: "What I've lived", accent: 'bg-sand-100 border-sand-300', count: counts.experience },
-    { view: 'somedayMaybe' as const, icon: '⭐', title: 'Someday, Maybe', tagline: 'Things to try, someday', accent: 'bg-terracotta-100/60 border-terracotta-300/50', count: somedayMaybeCount },
+    { view: 'somedayMaybe' as const, icon: '⭐', title: 'Someday, Maybe', tagline: 'Things to try, someday', accent: 'bg-terracotta-100/60 border-terracotta-400/30', count: somedayMaybeCount },
     { view: 'annualVision' as const, icon: '🎯', title: 'Annual Vision', tagline: "This year's vision board", accent: 'bg-sage-100/70 border-sage-300', count: annualVisionCount },
   ];
 

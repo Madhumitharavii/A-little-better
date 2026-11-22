@@ -10,6 +10,7 @@ import {
   dismissPasswordRecovery,
 } from '@/lib/sync/authService';
 import { runSync, subscribeSyncStatus, type SyncStatusInfo } from '@/lib/sync/syncEngine';
+import { saveSyncBookkeeping } from '@/db/repositories/settingsRepository';
 import { formatDisplayDate } from '@/shared/utils/formatDate';
 
 /**
@@ -320,6 +321,9 @@ export default function AccountSection({ showToast }: { showToast: (msg: string)
           <button
             onClick={async () => {
               await signOut();
+              // Forget this account's sync bookmarks, so signing in again (to any account)
+              // starts a clean, full sync instead of skipping data.
+              await saveSyncBookkeeping({ lastSyncedAt: undefined, syncCursors: {} });
               showToast('Signed out');
             }}
             className="px-2.5 py-1.5 bg-sand-200 hover:bg-sand-300 text-sand-900 rounded-lg font-semibold text-[11px]"

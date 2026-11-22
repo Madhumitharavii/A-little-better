@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   onClose: () => void;
@@ -16,7 +17,17 @@ export default function Modal({ onClose, children, maxWidthClassName = 'max-w-lg
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
-  return (
+  // Move keyboard focus into the dialog when it opens, and back where it was when it closes.
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    if (!cardRef.current?.contains(document.activeElement)) cardRef.current?.focus(); // keep a text box's own autofocus
+    return () => previous?.focus?.();
+  }, []);
+
+  // Rendered at the end of <body>, so it always sits above everything — including the
+  // desktop sidebar, which is its own layer (dialogs opened from it used to sit under the page).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-sand-900/40 backdrop-blur-sm flex items-center justify-center p-4"
       role="dialog"
@@ -26,11 +37,14 @@ export default function Modal({ onClose, children, maxWidthClassName = 'max-w-lg
       }}
     >
       <div
-        className={`bg-white rounded-3xl p-6 sm:p-8 w-full ${maxWidthClassName} shadow-2xl border border-sand-200 space-y-6 max-h-[90vh] overflow-y-auto`}
+        ref={cardRef}
+        tabIndex={-1}
+        className={`bg-white rounded-3xl p-6 sm:p-8 w-full ${maxWidthClassName} shadow-2xl border border-sand-200 space-y-6 max-h-[90vh] overflow-y-auto focus:outline-none`}
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

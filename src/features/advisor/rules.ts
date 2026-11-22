@@ -1,3 +1,4 @@
+import { localDateKeyOf } from '@/db/dateUtils';
 import { lifeItemActivityDates } from '@/db/lifeDates';
 import type {
   CareEntry,
@@ -69,7 +70,7 @@ export interface Insight {
 const DAY = 86_400_000;
 const dayNum = (key: string) => Date.parse(`${key.slice(0, 10)}T00:00:00Z`) / DAY;
 const daysBetween = (fromKey: string, toKey: string) => Math.round(dayNum(toKey) - dayNum(fromKey));
-const keyOf = (iso: string | undefined) => (iso ? iso.slice(0, 10) : undefined);
+const keyOf = (iso: string | undefined) => localDateKeyOf(iso);
 /** True if `key` falls within the `days` days ending today (today included). */
 const within = (key: string | undefined, today: string, days: number) => {
   if (!key) return false;
@@ -136,7 +137,8 @@ const screenBalance: Rule = (d) => {
   const shows = episodesWatched(d.life.filter((i): i is SeriesItem => i.type === 'series'), d.today, 7);
   const episodeCount = shows.reduce((s, x) => s + x.count, 0);
   const watched = movies.length + episodeCount;
-  const focus = careMinutes(d.care, 'focus', d.today, 7) + studyMinutes(d.studySessions, d.today, 7);
+  // Focus-timer sessions logged to a subject are already in the care focus total — don't count them twice.
+  const focus = careMinutes(d.care, 'focus', d.today, 7) + studyMinutes(d.studySessions.filter((x) => !x.fromFocus), d.today, 7);
   if (watched < 4 || focus >= 60) return null;
   const titles = [...shows.map((s) => s.title), ...movies.map((m) => m.title)];
   const what = [movies.length ? plural(movies.length, 'movie') : '', episodeCount ? plural(episodeCount, 'episode') : ''].filter(Boolean).join(' and ');

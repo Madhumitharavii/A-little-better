@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/db';
 import { useLifeRows } from '@/db/lifeStore';
+import { useToday } from '@/shared/hooks/useToday';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { allInsights, type AdvisorData, type Insight } from './rules';
 import { allSeen, chooseToday, dismissRule, loadHistory, markSeen, saveHistory, subscribeHistory, subscribeSeen } from './select';
@@ -20,13 +21,14 @@ function useAdvisorData(): AdvisorData | undefined {
   }, []);
   // Life rows come from the one shared copy of the table (lifeStore.ts).
   const life = useLifeRows();
+  const today = useToday();
   return useMemo(() => {
     if (!others || !life) return undefined;
     const { care, journal, reflections, people } = others;
     // The lifeItems table also holds study rows, "I'm bored" taps and synced preferences — split them out.
     const rows = life.filter((i) => !i.deletedAt) as unknown as Array<{ type: string }>;
     return {
-      today: getLocalDateKey(),
+      today,
       care,
       journal: journal.filter((j) => !j.deletedAt),
       reflections,
@@ -36,7 +38,7 @@ function useAdvisorData(): AdvisorData | undefined {
       subjects: rows.filter((i) => i.type === 'subject') as unknown as AdvisorData['subjects'],
       studySessions: rows.filter((i) => i.type === 'studySession') as unknown as AdvisorData['studySessions'],
     };
-  }, [others, life]);
+  }, [others, life, today]);
 }
 
 /**

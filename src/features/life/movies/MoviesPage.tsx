@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLifeItemsOfType } from '../useLifeItems';
 import { createLifeItem, updateLifeItem, toggleFavorite, deleteLifeItem, logMovieRewatch } from '@/db/repositories/lifeRepository';
 import type { MovieItem } from '@/db/schema';
+import { compareTitles } from '@/shared/utils/collate';
 import { getLocalDateKey } from '@/db/dateUtils';
 import MovieCard from './MovieCard';
 import MovieEditorModal from './MovieEditorModal';
@@ -21,7 +22,7 @@ const PAGE = 60;
 const hasReview = (m: MovieItem) => !!m.review || !!m.previousWatches?.some((w) => w.review);
 /** Newest watch first; films with no watch date after, by title. */
 const byLatest = (a: MovieItem, b: MovieItem) =>
-  (b.dateWatched ?? '').localeCompare(a.dateWatched ?? '') || a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" });
+  (b.dateWatched ?? '').localeCompare(a.dateWatched ?? '') || compareTitles(a.title, b.title);
 
 export default function MoviesPage({ showToast, onBack, initialOpenItem }: MoviesPageProps) {
   const movies = useLifeItemsOfType('movie') as MovieItem[];
@@ -37,6 +38,12 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
 
   const watched = useMemo(() => movies.filter((m) => m.status !== 'watchlist'), [movies]);
   const watchlist = useMemo(() => movies.filter((m) => m.status === 'watchlist'), [movies]);
+  // Sorted once per change to the library — not on every keystroke or tab switch.
+  const watchedSorted = useMemo(() => [...watched].sort(byLatest), [watched]);
+  const watchlistSorted = useMemo(
+    () => [...watchlist].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || compareTitles(a.title, b.title)),
+    [watchlist],
+  );
   const listNames = useMemo(() => {
     const names = new Map<string, number>();
     for (const m of movies) for (const l of m.lists ?? []) names.set(l.name, (names.get(l.name) ?? 0) + 1);
@@ -59,7 +66,7 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
 
   const filtered = useMemo(() => {
     let out: MovieItem[];
-    if (tab === 'watchlist') out = [...watchlist].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" }));
+    if (tab === 'watchlist') out = watchlistSorted;
     else if (tab === 'lists') {
       if (!list) out = [];
       else {
@@ -67,7 +74,7 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
         out = movies.filter((m) => m.lists?.some((l) => l.name === list)).sort((a, b) => pos(a) - pos(b));
       }
     } else {
-      out = [...watched].sort(byLatest);
+      out = watchedSorted;
       if (tab === 'favorites') out = out.filter((m) => m.favorite);
       else if (tab === 'rewatches') out = out.filter((m) => m.rewatch);
       else if (tab === 'reviews') out = out.filter(hasReview);
@@ -76,7 +83,7 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
     const q = query.trim().toLowerCase();
     if (q) out = out.filter((m) => m.title.toLowerCase().includes(q));
     return out;
-  }, [movies, watched, watchlist, tab, query, list]);
+  }, [movies, watchedSorted, watchlistSorted, tab, query, list]);
 
   return (
     <div className="space-y-5">

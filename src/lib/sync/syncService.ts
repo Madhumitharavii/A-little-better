@@ -22,15 +22,38 @@ function requireSupabase() {
 }
 
 /**
- * The columns an upsert matches on. Every table's primary key is `id`
- * alone, except `settings`, whose primary key is the composite
- * (user_id, id) — see 0001_initial_schema.sql. Matching on the real
- * primary key means no extra database constraint is needed (so
- * migration 0002 is optional).
+ * The columns an upsert matches on. Usually the primary key `id`; `settings` uses its
+ * composite key (user_id, id). Care entries and daily reflections have a UNIQUE rule on
+ * their natural key in 0001_initial_schema.sql — one per (user, date, item) and per
+ * (user, date) — so they're matched on THAT: re-ticking an item (a new local id) or a
+ * second device writing the same day then updates the existing row instead of being
+ * rejected (which used to stop every later sync).
  */
-function conflictTarget(table: SyncTableName): string {
-  return table === 'settings' ? 'user_id,id' : 'id';
+export function conflictTarget(table: SyncTableName): string {
+  if (table === 'settings') return 'user_id,id';
+  if (table === 'care_entries') return 'user_id,date,item_key';
+  if (table === 'daily_reflections') return 'user_id,date';
+  return 'id';
 }
+
+/**
+ * The server's updated_at for each of these rows (only ones that exist). Used before
+ * pushing, so a device never overwrites a NEWER version already in the account (e.g.
+ * after editing offline, or restoring an old backup).
+ */
+export async function fetchRemoteStamps(table: SyncTableName, userId: string, ids: string[]): Promise<Map<string, string>> {
+  const client = requireSupabase();
+  const stamps = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += STAMP_CHUNK) {
+    const chunk = ids.slice(i, i + STAMP_CHUNK);
+    const { data, error } = await client.from(table).select('id, updated_at').eq('user_id', userId).in('id', chunk);
+    if (error) throw error;
+    for (const row of (data ?? []) as { id: string; updated_at: string }[]) stamps.set(row.id, row.updated_at);
+  }
+  return stamps;
+}
+
+const STAMP_CHUNK = 150;
 
 /**
  * Upserts a single row (insert-or-update, matched by its primary key) into
@@ -76,17 +99,37 @@ export const PULL_PAGE = 1000;
  */
 export async function pullRowsSince<T>(table: SyncTableName, userId: string, sinceIso?: string): Promise<T[]> {
   const client = requireSupabase();
+  // Keyset paging on synced_at: each page starts from the last timestamp seen (not a row
+  // offset), so a row another device updates mid-pull just moves to a later page instead
+  // of shifting the others and making one get skipped.
+  type Row = { id: string; synced_at: string };
   const all: T[] = [];
-  for (let from = 0; ; from += PULL_PAGE) {
+  const seen = new Set<string>();
+  let since = sinceIso;
+  let inclusive = false;
+  for (let guard = 0; guard < 10_000; guard++) {
     let query = client.from(table).select('*').eq('user_id', userId);
-    if (sinceIso) {
-      query = query.gt('synced_at', sinceIso);
-    }
-    // A stable order so pages never overlap or skip rows.
-    const { data, error } = await query.order('synced_at', { ascending: true }).order('id', { ascending: true }).range(from, from + PULL_PAGE - 1);
+    if (since) query = inclusive ? query.gte('synced_at', since) : query.gt('synced_at', since);
+    const { data, error } = await query.order('synced_at', { ascending: true }).order('id', { ascending: true }).limit(PULL_PAGE);
     if (error) throw error;
-    all.push(...((data ?? []) as T[]));
-    if (!data || data.length < PULL_PAGE) break;
+    const rows = (data ?? []) as Row[];
+    for (const row of rows) if (!seen.has(row.id)) (seen.add(row.id), all.push(row as unknown as T));
+    if (rows.length < PULL_PAGE) break;
+    const last = rows[rows.length - 1].synced_at;
+    if (rows.every((r) => r.synced_at === last)) {
+      // A full page sharing one timestamp: read the rest of that timestamp by offset, then move past it.
+      for (let from = PULL_PAGE; ; from += PULL_PAGE) {
+        const { data: more, error: err } = await client.from(table).select('*').eq('user_id', userId).eq('synced_at', last).order('id', { ascending: true }).range(from, from + PULL_PAGE - 1);
+        if (err) throw err;
+        for (const row of (more ?? []) as Row[]) if (!seen.has(row.id)) (seen.add(row.id), all.push(row as unknown as T));
+        if (!more || more.length < PULL_PAGE) break;
+      }
+      since = last;
+      inclusive = false;
+    } else {
+      since = last;
+      inclusive = true; // rows sharing the last timestamp may continue on the next page (already-seen ones are skipped)
+    }
   }
   return all;
 }

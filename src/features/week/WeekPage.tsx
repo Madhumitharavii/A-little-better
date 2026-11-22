@@ -1,8 +1,8 @@
+import { useToday } from '@/shared/hooks/useToday';
 import { useLifeRows } from '@/db/lifeStore';
 import { useWeekData } from './useWeekData';
 import { deriveLittleThings } from './littleThings';
 import { usePeriodEntries } from '@/features/me/period/usePeriodEntries';
-import { getLocalDateKey } from '@/db/dateUtils';
 import { formatDisplayDate } from '@/shared/utils/formatDate';
 import { useState } from 'react';
 import StudySection from '@/features/study/StudySection';
@@ -88,7 +88,7 @@ export default function WeekPage({ showToast }: { showToast: (msg: string) => vo
     .map((sub) => ({ id: sub.id, minutes: totalMinutes(weekSessions.filter((x) => x.subjectId === sub.id)), title: `${sub.icon ? `${sub.icon} ` : ''}${sub.title}` }))
     .filter((x) => x.minutes > 0)
     .map((x) => ({ id: x.id, title: `${x.title} — ${formatMinutes(x.minutes)}` }));
-  const today = getLocalDateKey();
+  const today = useToday();
   const week = useWeekData(today);
   const { stats: cycleStats } = usePeriodEntries();
   const littleThings = deriveLittleThings(week);

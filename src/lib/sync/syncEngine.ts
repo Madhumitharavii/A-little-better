@@ -9,6 +9,7 @@ import {
   pushRow,
   pushRows,
   pullRowsSince,
+  fetchRemoteStamps,
   softDeleteRow,
   uploadImageBlob,
   downloadImageBlob,
@@ -201,50 +202,129 @@ async function syncTable<
   findLocalTwin?: (remote: Remote) => Promise<Local | undefined>,
   /** Table name used for tombstones when a duplicate twin is resolved. */
   twinTombstoneTable?: 'care_entries',
+  /**
+   * For twins whose content should be COMBINED rather than one discarded (daily
+   * reflections: morning notes on the phone + evening notes on the Mac, same day).
+   */
+  mergeTwin?: (remote: Local, twin: Local) => Local,
+  /** The natural key a table's rows are unique on (care: date+item, reflections: date), for de-duplicating a push. */
+  naturalKey?: (row: Local) => string,
 ): Promise<void> {
+  // Tables with a natural key (care, reflections) PULL first: a row for the same day from
+  // another device may have a different id, so twins are resolved (or combined) here before
+  // anything is uploaded — otherwise an older upload could replace a newer row for that day.
+  if (naturalKey) {
+    await pull();
+    await push();
+  } else {
+    await push();
+    await pull();
+  }
+
+  async function push() {
   // PUSH: local rows changed since the last sync (or everything, on
-  // a first sync) go up first, so local-only data always reaches the
-  // account before anything could be pulled over it.
+  // a first sync) go up, so local-only data always reaches the account.
   const allLocal = await dexieTable.toArray();
-  const toPush = pushSinceIso ? allLocal.filter((row) => isLater(row.updatedAt, pushSinceIso)) : allLocal;
+  let toPush = pushSinceIso ? allLocal.filter((row) => isLater(row.updatedAt, pushSinceIso)) : allLocal;
+  if (naturalKey) {
+    // One row per natural key per upload (an upsert can't touch the same row twice).
+    const newest = new Map<string, Local>();
+    for (const row of toPush) {
+      const key = naturalKey(row);
+      const had = newest.get(key);
+      if (!had || isLater(row.updatedAt, had.updatedAt)) newest.set(key, row);
+    }
+    toPush = [...newest.values()];
+  }
+  if (toPush.length > 0) {
+    // Never overwrite a NEWER version already in the account (an older offline edit, or a
+    // restored backup, would otherwise replace newer data or bring deleted rows back).
+    const stamps = await fetchRemoteStamps(table, userId, toPush.map((row) => row.id));
+    toPush = toPush.filter((row) => {
+      const remoteStamp = stamps.get(row.id);
+      return !remoteStamp || !isLater(remoteStamp, row.updatedAt);
+    });
+  }
   if (toPush.length > 0) {
     await pushRows(table, toPush.map((row) => toRemote(row, userId, deviceId)));
   }
+  }
 
+  async function pull() {
   // PULL: only ever creates missing rows or applies strictly-newer ones.
   const remoteRows = await pullRowsSince<Remote>(table, userId, pullSinceFor(cursors, table));
-  for (const remote of remoteRows) {
-    const local = await dexieTable.get(remote.id);
-    if (!local) {
-      if (remote.deleted_at) continue;
-      const twin = findLocalTwin ? await findLocalTwin(remote) : undefined;
-      if (twin && twinTombstoneTable) {
-        // Two records for the same thing (e.g. "Bath" on the same day,
-        // ticked on two devices). Keep whichever was changed last;
-        // the other is removed here and marked deleted remotely on the
-        // next sync, so every device ends up with the same single row.
-        if (isLater(remote.updated_at, twin.updatedAt)) {
+
+  if (findLocalTwin) {
+    // Small tables with a natural key (care, reflections): row by row, to resolve twins.
+    for (const remote of remoteRows) {
+      const local = await dexieTable.get(remote.id);
+      if (!local) {
+        if (remote.deleted_at) continue;
+        const twin = await findLocalTwin(remote);
+        if (twin && mergeTwin) {
+          // Keep both devices' writing: combine into the remote id, and push the result back.
           await dexieTable.delete(twin.id);
-          await recordTombstone(twinTombstoneTable, twin.id);
-          await dexieTable.put(fromRemote(remote));
-        } else {
-          await recordTombstone(twinTombstoneTable, remote.id);
+          await dexieTable.put({ ...mergeTwin(fromRemote(remote), twin), id: remote.id, updatedAt: nowIso() });
+          continue;
         }
+        if (twin && twinTombstoneTable) {
+          // Two records for the same thing (e.g. "Bath" on the same day, ticked on two
+          // devices). Keep whichever was changed last.
+          if (isLater(remote.updated_at, twin.updatedAt)) {
+            await dexieTable.delete(twin.id);
+            await recordTombstone(twinTombstoneTable, twin.id);
+            await dexieTable.put(fromRemote(remote));
+          } else {
+            await recordTombstone(twinTombstoneTable, remote.id);
+          }
+          continue;
+        }
+        await dexieTable.put(fromRemote(remote));
         continue;
       }
-      await dexieTable.put(fromRemote(remote));
-      continue;
-    }
-    if (isLater(remote.updated_at, local.updatedAt)) {
-      if (remote.deleted_at && !localHasSoftDelete) {
-        await dexieTable.delete(remote.id);
-      } else {
-        await dexieTable.put(fromRemote(remote));
+      if (isLater(remote.updated_at, local.updatedAt)) {
+        if (remote.deleted_at && !localHasSoftDelete) await dexieTable.delete(remote.id);
+        else await dexieTable.put(fromRemote(remote));
       }
     }
-    // else: local is newer or equal — keep local, do nothing.
+  } else if (remoteRows.length > 0) {
+    // Everything else: decide in memory and write in a few big batches — thousands of
+    // rows (e.g. a first sync of a big library) apply in a moment instead of one by one.
+    const locals = await dexieTable.bulkGet(remoteRows.map((r) => r.id));
+    const puts: Local[] = [];
+    const deletes: string[] = [];
+    remoteRows.forEach((remote, i) => {
+      const local = locals[i];
+      if (!local) {
+        if (!remote.deleted_at) puts.push(fromRemote(remote));
+      } else if (isLater(remote.updated_at, local.updatedAt)) {
+        if (remote.deleted_at && !localHasSoftDelete) deletes.push(remote.id);
+        else puts.push(fromRemote(remote));
+      }
+    });
+    for (let i = 0; i < puts.length; i += APPLY_CHUNK) await dexieTable.bulkPut(puts.slice(i, i + APPLY_CHUNK));
+    if (deletes.length) await dexieTable.bulkDelete(deletes);
   }
   advanceCursor(cursors, table, remoteRows);
+  }
+}
+
+const APPLY_CHUNK = 500;
+
+/** Combines two versions of the same day's reflection: each field from whichever has it, newer winning when both do. */
+export function mergeReflections(remote: DailyReflection, twin: DailyReflection): DailyReflection {
+  const [newer, older] = isLater(twin.updatedAt, remote.updatedAt) ? [twin, remote] : [remote, twin];
+  const pick = <K extends keyof DailyReflection>(k: K) => (newer[k] !== undefined && newer[k] !== '' ? newer[k] : older[k]);
+  return {
+    ...older,
+    ...newer,
+    gratitude: pick('gratitude'),
+    smallWin: pick('smallWin'),
+    eveningGoodThing: pick('eveningGoodThing'),
+    eveningLeaveForTomorrow: pick('eveningLeaveForTomorrow'),
+    eveningMood: pick('eveningMood'),
+    eveningDone: !!(remote.eveningDone || twin.eveningDone),
+  };
 }
 
 /**
@@ -262,8 +342,12 @@ async function syncSettings(
   cursors: Cursors,
 ): Promise<void> {
   const local = await getSettings();
-  if (!pushSinceIso || isLater(local.updatedAt, pushSinceIso)) {
-    await pushRow('settings', mapping.settingsToRemote(local, userId, deviceId));
+  const untouchedDefaults = Date.parse(local.updatedAt) <= 0; // a fresh install's defaults (see settingsRepository)
+  if (!untouchedDefaults && (!pushSinceIso || isLater(local.updatedAt, pushSinceIso))) {
+    const remoteStamp = (await fetchRemoteStamps('settings', userId, [userId])).get(userId);
+    if (!remoteStamp || !isLater(remoteStamp, local.updatedAt)) {
+      await pushRow('settings', mapping.settingsToRemote(local, userId, deviceId));
+    }
   }
 
   const remoteRows = await pullRowsSince<RemoteSettings>('settings', userId, pullSinceFor(cursors, 'settings'));
@@ -420,6 +504,8 @@ export async function runSync(): Promise<void> {
       false,
       (remote) => db.careEntries.where('[date+itemKey]').equals([remote.date, remote.item_key]).first(),
       'care_entries',
+      undefined,
+      (row) => `${row.date}|${row.itemKey}`,
     );
     await syncTable<DailyReflection, RemoteDailyReflection>(
       'daily_reflections',
@@ -431,6 +517,10 @@ export async function runSync(): Promise<void> {
       pushSinceIso,
       cursors,
       false,
+      (remote) => db.dailyReflections.where('date').equals(remote.date).first(),
+      undefined,
+      mergeReflections,
+      (row) => row.date,
     );
     await syncTable<JournalEntry, RemoteJournalEntry>(
       'journal_entries',

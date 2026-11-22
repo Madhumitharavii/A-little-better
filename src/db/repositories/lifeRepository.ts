@@ -1,5 +1,6 @@
 import { isWishlistItem } from '@/db/lifeDates';
 import { db } from '../db';
+import { getLocalDateKey } from '../dateUtils';
 import { generateId, nowIso } from '../id';
 import type { LifeItem, LifeItemType, NewLifeItemInput, LifeItemPatch, BookItem, MovieItem } from '../schema';
 import { deleteLifeImage } from './lifeImageRepository';
@@ -77,6 +78,20 @@ export async function bulkCreateLifeItems(inputs: NewLifeItemInput[]): Promise<n
   return items.length;
 }
 
+/** Applies many patches in one transaction (imports re-run over thousands of items). */
+export async function bulkUpdateLifeItems(updates: { id: string; patch: LifeItemPatch }[]): Promise<number> {
+  if (!updates.length) return 0;
+  const timestamp = nowIso();
+  return db.transaction('rw', db.lifeItems, async () => {
+    const existing = await db.lifeItems.bulkGet(updates.map((u) => u.id));
+    const next = existing
+      .map((item, i) => (item ? ({ ...item, ...updates[i].patch, updatedAt: timestamp } as LifeItem) : null))
+      .filter((x): x is LifeItem => x !== null);
+    await db.lifeItems.bulkPut(next);
+    return next.length;
+  });
+}
+
 export async function updateLifeItem(id: string, patch: LifeItemPatch): Promise<LifeItem | undefined> {
   const existing = await db.lifeItems.get(id);
   if (!existing) return undefined;
@@ -117,7 +132,7 @@ export async function logBookReread(id: string): Promise<BookItem | undefined> {
   const updated: BookItem = {
     ...existing,
     status: 'inProgress',
-    dateStarted: nowIso().slice(0, 10),
+    dateStarted: getLocalDateKey(),
     dateFinished: undefined,
     rating: undefined,
     notes: undefined,
@@ -147,7 +162,7 @@ export async function logMovieRewatch(id: string): Promise<MovieItem | undefined
 
   const updated: MovieItem = {
     ...existing,
-    dateWatched: nowIso().slice(0, 10),
+    dateWatched: getLocalDateKey(),
     rating: undefined,
     review: undefined,
     rewatch: true,

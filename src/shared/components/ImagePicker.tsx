@@ -26,8 +26,10 @@ export default function ImagePicker({ imageId, onChange, label = 'Add a photo', 
   return (
     <div>
       <label className="block text-xs font-semibold text-sand-900 mb-1.5">{label}</label>
-      <div
-        className={`relative w-full ${aspectClassName} bg-sand-50 border border-dashed border-sand-300 rounded-2xl overflow-hidden flex items-center justify-center cursor-pointer hover:border-sand-400 transition-colors`}
+      <button
+        type="button"
+        aria-label={previewUrl ? `Change ${label}` : `Choose ${label}`}
+        className={`relative w-full ${aspectClassName} bg-sand-50 border border-dashed border-sand-300 rounded-2xl overflow-hidden flex items-center justify-center cursor-pointer hover:border-sand-800/40 transition-colors`}
         onClick={() => inputRef.current?.click()}
       >
         {previewUrl ? (
@@ -38,18 +40,18 @@ export default function ImagePicker({ imageId, onChange, label = 'Add a photo', 
             <span className="text-[11px] text-sand-800/60">{uploading ? 'Saving…' : 'Tap to choose a photo'}</span>
           </div>
         )}
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = '';
-            if (file) handleFile(file);
-          }}
-        />
-      </div>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) handleFile(file);
+        }}
+      />
       {imageId && (
         <button
           type="button"

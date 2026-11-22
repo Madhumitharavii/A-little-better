@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import Modal, { ModalHeader } from '@/shared/components/Modal';
 import type { MovieItem } from '@/db/schema';
-import { bulkCreateLifeItems, updateLifeItem } from '@/db/repositories/lifeRepository';
+import { bulkCreateLifeItems, bulkUpdateLifeItems } from '@/db/repositories/lifeRepository';
 import { classifyExportFile, parseLetterboxdExport, planImport, type ExportFile, type ImportPlan } from './letterboxdImport';
 
 interface LetterboxdImportModalProps {
@@ -51,7 +51,7 @@ export default function LetterboxdImportModal({ existingMovies, onClose, onImpor
     setBusy('Importing…');
     try {
       const created = plan.creates.length ? await bulkCreateLifeItems(plan.creates) : 0;
-      for (const { id, patch } of plan.updates) await updateLifeItem(id, patch);
+      await bulkUpdateLifeItems(plan.updates);
       onImported(created + plan.updates.length);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The import could not be completed.');

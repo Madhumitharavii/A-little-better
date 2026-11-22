@@ -1,4 +1,5 @@
 import type { PeriodEntry } from '@/db/schema';
+import { getLocalDateKey } from '@/db/dateUtils';
 import { parseCycleCsv } from './periodImport';
 
 /**
@@ -46,7 +47,7 @@ const keyMs = (key: string) => Date.parse(`${key}T00:00:00Z`);
 
 /** "2024-03-05", "2024-03-05T00:00:00Z", "2024/03/05" or a Unix timestamp → "2024-03-05". */
 export function dayKey(value: unknown): string | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return toKey(value < 1e12 ? value * 1000 : value);
+  if (typeof value === 'number' && Number.isFinite(value)) return getLocalDateKey(new Date(value < 1e12 ? value * 1000 : value));
   if (typeof value !== 'string') return undefined;
   const m = value.trim().match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
   if (!m) return undefined;
@@ -68,7 +69,7 @@ function floData(json: unknown): Record<string, unknown> | null {
   return null;
 }
 
-export function parseFloJson(json: unknown, today: string): ParsedCycleFile {
+export function parseFloJson(json: unknown, today: string, format: ParsedCycleFile['format'] = 'flo'): ParsedCycleFile {
   const data = floData(json);
   if (!data) throw new Error("This doesn't look like a Flo export (no cycles found). If it came as a ZIP, unzip it first and choose the .json file inside.");
   const adjustments: Record<string, number> = {};
@@ -123,7 +124,7 @@ export function parseFloJson(json: unknown, today: string): ParsedCycleFile {
     if (p && (!p.flow || FLOW_RANK[flow] > FLOW_RANK[p.flow])) p.flow = flow;
   }
 
-  return { format: 'flo', periods: dedupe(periods), adjustments, events };
+  return { format, periods: dedupe(periods), adjustments, events };
 }
 
 function dedupe(periods: ImportedPeriod[]): ImportedPeriod[] {
@@ -151,8 +152,9 @@ export function parseCycleFile(text: string, today: string): ParsedCycleFile {
   if (trimmed.includes('"operationalData"')) {
     return parseFloJson(JSON.parse(trimmed.slice(trimmed.indexOf('{'), trimmed.lastIndexOf('}') + 1)), today);
   }
+  // A CSV gets the same checks as Flo's cycles (future predictions, end before start, too long).
   const rows = parseCycleCsv(trimmed);
-  return { format: 'csv', periods: dedupe(rows.map((r) => ({ startDate: r.startDate, endDate: r.endDate }))), adjustments: {}, events: {} };
+  return parseFloJson({ cycles: rows.map((r) => ({ period_start_date: r.startDate, period_end_date: r.endDate })) }, today, 'csv');
 }
 
 export interface PeriodImportPlan {

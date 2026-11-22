@@ -15,7 +15,10 @@ vi.mock('@/lib/supabaseClient', () => {
       select: () => q,
       eq: (col: string, v: string) => ((filtered = filtered.filter((r) => (r as Record<string, string>)[col] === v)), q),
       gt: (col: string, v: string) => ((filtered = filtered.filter((r) => (r as Record<string, string>)[col] > v)), q),
-      order: (col: string) => ((filtered = [...filtered].sort((a, b) => ((a as Record<string, string>)[col] < (b as Record<string, string>)[col] ? -1 : (a as Record<string, string>)[col] > (b as Record<string, string>)[col] ? 1 : 0))), q),
+      gte: (col: string, v: string) => ((filtered = filtered.filter((r) => (r as Record<string, string>)[col] >= v)), q),
+      limit: async (n: number) => ({ data: filtered.slice(0, Math.min(n, 1000)), error: null }),
+      // Sort by synced_at then id (the app always orders by both).
+      order: () => ((filtered = [...filtered].sort((a, b) => a.synced_at.localeCompare(b.synced_at) || a.id.localeCompare(b.id))), q),
       range: async (from: number, to: number) => ({ data: filtered.slice(from, Math.min(to + 1, from + 1000)), error: null }),
       upsert: async (rows: unknown[]) => (server.upserts.push(rows.length), { error: null }),
     };
@@ -32,6 +35,12 @@ describe('sync paging', () => {
     const rows = await pullRowsSince<{ id: string }>('life_items', 'u1');
     expect(rows).toHaveLength(2345);
     expect(new Set(rows.map((r) => r.id)).size).toBe(2345);
+  });
+
+  it('still gets every row when more than a page share one timestamp (one big import)', async () => {
+    server.rows = Array.from({ length: 2500 }, (_, i) => ({ id: `b${String(i).padStart(5, '0')}`, user_id: 'u1', synced_at: '2026-11-21T10:00:00Z' }));
+    const rows = await pullRowsSince<{ id: string }>('life_items', 'u1');
+    expect(new Set(rows.map((r) => r.id)).size).toBe(2500);
   });
 
   it('pushes big batches in chunks', async () => {

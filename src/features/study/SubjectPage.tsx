@@ -12,7 +12,7 @@ import {
 import ConfirmInline from '@/shared/components/ConfirmInline';
 import DateField from '@/shared/components/DateField';
 import { formatDisplayDate } from '@/shared/utils/formatDate';
-import { useStudySessions, useSubjects, sessionsWithin, totalMinutes, formatMinutes } from './useStudy';
+import { useStudySessions, useSubjects, sessionsWithin, totalMinutes, formatMinutes, sessionsThisWeek } from './useStudy';
 import { startStudyTimer, useStudyTimer } from './studyTimer';
 import StudySessionModal from './StudySessionModal';
 import WeeklyGoalSection from './WeeklyGoalSection';
@@ -84,7 +84,7 @@ export default function SubjectPage({ subjectId, onBack, showToast }: SubjectPag
 
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
-            ['This week', formatMinutes(totalMinutes(sessionsWithin(sessions, 7)))],
+            ['This week', formatMinutes(totalMinutes(sessionsThisWeek(sessions)))],
             ['This month', formatMinutes(totalMinutes(sessionsWithin(sessions, 30)))],
             ['All time', formatMinutes(totalMinutes(sessions))],
           ].map(([label, value]) => (

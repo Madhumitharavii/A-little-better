@@ -1,4 +1,5 @@
 import type { BookItem, LifeItem, MovieItem, WishItem } from '@/db/schema';
+import { booksFinishedIn, readingGoalTarget } from '@/features/life/wishlist/visionList';
 
 /**
  * Ideas for the "I'm bored" button. Personal ideas come from what's
@@ -44,11 +45,8 @@ export function startableByWords(title: string): boolean | null {
   return null;
 }
 
-/** "Read 12 books" → 12. */
-export function readingGoalTarget(title: string): number | null {
-  const m = title.match(/\bread\b[^\d]{0,20}(\d{1,4})\s+books?\b/i) ?? title.match(/^(\d{1,4})\s+books?\b/i);
-  return m ? Number(m[1]) : null;
-}
+/** One definition of a reading goal, shared with the vision board. */
+export { readingGoalTarget };
 
 export function buildPersonalIdeas(life: LifeItem[], year: number, aiStartable: Map<string, boolean> = new Map()): BoredIdea[] {
   const live = life.filter((i) => !i.deletedAt);
@@ -57,7 +55,7 @@ export function buildPersonalIdeas(life: LifeItem[], year: number, aiStartable: 
   const wishes = live.filter((i): i is WishItem => i.type === 'wish' && !i.done && !i.missed);
   const vision = wishes.filter((w) => w.listType === 'annualVision' && (w.year ?? year) === year);
   const someday = wishes.filter((w) => (w.listType ?? 'somedayMaybe') === 'somedayMaybe');
-  const readThisYear = live.filter((i) => i.type === 'book' && i.status === 'finished' && i.dateFinished?.startsWith(String(year))).length;
+  const readThisYear = booksFinishedIn(live.filter((i): i is BookItem => i.type === 'book'), year);
 
   const ideas: BoredIdea[] = [];
   if (watchlist.length) {

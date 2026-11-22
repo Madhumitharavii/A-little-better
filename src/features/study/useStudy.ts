@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { selectStudySessions, selectSubjects } from '@/db/repositories/studyRepository';
 import { useLifeRows } from '@/db/lifeStore';
 import { getLocalDateKey } from '@/db/dateUtils';
+import { weekBounds } from './goals';
 import type { StudySessionItem } from '@/db/schema';
 
 export function useSubjects() {
@@ -22,6 +23,12 @@ export function sessionsWithin(sessions: StudySessionItem[], days: number, today
     const diff = dayNum(today) - dayNum(s.date);
     return diff >= 0 && diff < days;
   });
+}
+
+/** Sessions in the current Monday–Sunday week (what every "this week" label means, matching weekly goals). */
+export function sessionsThisWeek(sessions: StudySessionItem[], today = getLocalDateKey()) {
+  const { start, end } = weekBounds(today);
+  return sessions.filter((s) => s.date >= start && s.date <= end);
 }
 
 export const totalMinutes = (sessions: StudySessionItem[]) => sessions.reduce((sum, s) => sum + s.minutes, 0);

@@ -1,7 +1,8 @@
+import { useLifeRows } from '@/db/lifeStore';
 import { useState } from 'react';
 import { addStarterSubjects } from '@/db/repositories/studyRepository';
 import type { SubjectItem } from '@/db/schema';
-import { useSubjects, useStudySessions, sessionsWithin, totalMinutes, formatMinutes, daysAgoLabel } from './useStudy';
+import { useSubjects, useStudySessions, sessionsThisWeek, totalMinutes, formatMinutes, daysAgoLabel } from './useStudy';
 import { useStudyTimer, startStudyTimer, stopStudyTimer, formatClock } from './studyTimer';
 import StudySessionModal from './StudySessionModal';
 import AddSubjectModal from './AddSubjectModal';
@@ -21,6 +22,7 @@ interface StudySectionProps {
 export default function StudySection({ showToast, onOpenSubject }: StudySectionProps) {
   const subjects = useSubjects();
   const sessions = useStudySessions();
+  const allRows = useLifeRows();
   const { timer, seconds } = useStudyTimer();
   const [pickSubjectId, setPickSubjectId] = useState<string | null>(null);
   const [pickTopicId, setPickTopicId] = useState<string | undefined>();
@@ -30,18 +32,21 @@ export default function StudySection({ showToast, onOpenSubject }: StudySectionP
 
   if (!subjects) return null;
 
-  const week = sessionsWithin(sessions, 7);
+  const week = sessionsThisWeek(sessions);
   const weekTotal = totalMinutes(week);
-  const running = timer ? subjects.find((s) => s.id === timer.subjectId) : undefined;
+  // The timer's subject — or, if that copy was merged away (a duplicate) or removed, the
+  // live subject with the same name, so a running timer can always be stopped and saved.
+  const running = timer ? resolveTimerSubject(timer.subjectId, subjects, allRows ?? []) : undefined;
   const runningTopic = running?.topics.find((t) => t.id === timer?.topicId);
   const chosen = subjects.find((s) => s.id === (pickSubjectId ?? subjects[0]?.id));
 
   const stop = () => {
-    const ended = stopStudyTimer();
-    if (!ended) return;
-    const minutes = Math.max(1, Math.round((Date.now() - Date.parse(ended.startedAt)) / 60000));
+    // The timer is only cleared once the session is saved (or you confirm discarding it),
+    // so closing the app while the save box is open never loses the session.
+    if (!timer) return;
+    const minutes = Math.max(1, Math.round((Date.now() - Date.parse(timer.startedAt)) / 60000));
     // Saved on the day you started.
-    setSaveAfterTimer({ subjectId: ended.subjectId, topicId: ended.topicId, minutes, date: localKey(ended.startedAt) });
+    setSaveAfterTimer({ subjectId: running?.id ?? timer.subjectId, topicId: timer.topicId, minutes, date: localKey(timer.startedAt) });
   };
 
   return (
@@ -165,8 +170,13 @@ export default function StudySection({ showToast, onOpenSubject }: StudySectionP
           initialTopicId={saveAfterTimer.topicId}
           initialMinutes={saveAfterTimer.minutes}
           initialDate={saveAfterTimer.date}
-          onClose={() => setSaveAfterTimer(null)}
+          onClose={() => {
+            // Reached only after confirming "Discard this session?"
+            stopStudyTimer();
+            setSaveAfterTimer(null);
+          }}
           onSaved={(msg) => {
+            stopStudyTimer();
             setSaveAfterTimer(null);
             showToast(msg);
           }}
@@ -203,7 +213,7 @@ function localKey(iso: string): string {
 }
 
 function SubjectRow({ subject, sessions, onOpen }: { subject: SubjectItem; sessions: import('@/db/schema').StudySessionItem[]; onOpen: () => void }) {
-  const week = totalMinutes(sessionsWithin(sessions, 7));
+  const week = totalMinutes(sessionsThisWeek(sessions));
   const goal = goalProgress(subject, sessions, weekBounds(getLocalDateKey()).start);
   const confident = subject.topics.filter((t) => t.status === 'confident').length;
   const learning = subject.topics.filter((t) => t.status === 'learning').length;
@@ -246,4 +256,13 @@ function SubjectRow({ subject, sessions, onOpen }: { subject: SubjectItem; sessi
       </button>
     </li>
   );
+}
+
+/** A running timer's subject: itself if it still exists, else the live subject with the same name (after a merge), else the first subject. */
+function resolveTimerSubject(subjectId: string, subjects: SubjectItem[], rows: readonly { id: string; type: string; title?: unknown }[]): SubjectItem | undefined {
+  const direct = subjects.find((s) => s.id === subjectId);
+  if (direct) return direct;
+  const old = rows.find((r) => r.id === subjectId && r.type === 'subject');
+  const title = typeof old?.title === 'string' ? old.title.trim().toLowerCase() : '';
+  return subjects.find((s) => s.title.trim().toLowerCase() === title) ?? subjects[0];
 }

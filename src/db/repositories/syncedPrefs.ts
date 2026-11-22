@@ -14,7 +14,9 @@ export type PrefKey = 'aiEnabled' | 'advisorHistory' | 'advisorSeen' | 'studyTim
 const table = () => db.lifeItems as unknown as Table<SyncedPrefItem, string>;
 
 async function newest(key: PrefKey): Promise<SyncedPrefItem | undefined> {
-  const rows = (await table().toArray()).filter((r) => r.type === 'pref' && r.key === key && !r.deletedAt);
+  // The shared copy when it's loaded (no extra full read of the table); otherwise read it.
+  const all = (getLifeRows() as unknown as SyncedPrefItem[] | undefined) ?? (await table().toArray());
+  const rows = all.filter((r) => r.type === 'pref' && r.key === key && !r.deletedAt);
   return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
 }
 

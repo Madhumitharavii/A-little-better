@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getAllCareEntries } from '@/db/repositories/careRepository';
 import { getJournalEntries } from '@/db/repositories/journalRepository';
@@ -57,10 +58,16 @@ export function useWeekData(today: string = getLocalDateKey()): WeekData {
   });
 
   const journalEntriesThisWeek = journalEntries.filter((e) => weekDates.has(e.date));
-  const booksThisWeek = books.filter((b) => lifeItemDateInWeek(b, weekDates));
-  const moviesAndSeriesThisWeek = [...movies, ...series].filter((m) => lifeItemDateInWeek(m, weekDates));
-  const artworkThisWeek = artwork.filter((a) => lifeItemDateInWeek(a, weekDates));
-  const experiencesThisWeek = experiences.filter((e) => lifeItemDateInWeek(e, weekDates));
+  // Only re-worked when the library or the day changes (thousands of items), not on every redraw.
+  const { booksThisWeek, moviesAndSeriesThisWeek, artworkThisWeek, experiencesThisWeek } = useMemo(() => {
+    const dates = new Set(weekDateKeys);
+    return {
+      booksThisWeek: books.filter((b) => lifeItemDateInWeek(b, dates)),
+      moviesAndSeriesThisWeek: [...movies, ...series].filter((m) => lifeItemDateInWeek(m, dates)),
+      artworkThisWeek: artwork.filter((a) => lifeItemDateInWeek(a, dates)),
+      experiencesThisWeek: experiences.filter((e) => lifeItemDateInWeek(e, dates)),
+    };
+  }, [books, movies, series, artwork, experiences, today]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     days,

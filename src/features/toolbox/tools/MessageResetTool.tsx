@@ -28,16 +28,18 @@ export default function MessageResetTool({ onClose, onComplete }: MessageResetTo
 
       <div className="space-y-2">
         {APPS.map((item) => (
-          <div
+          <button
+            type="button"
             key={item.id}
             onClick={() => toggle(item.id)}
-            className={`p-3 rounded-2xl border text-xs flex items-center justify-between cursor-pointer transition-colors ${
+            aria-pressed={!!checked[item.id]}
+            className={`w-full text-left p-3 rounded-2xl border text-xs flex items-center justify-between cursor-pointer transition-colors ${
               checked[item.id] ? 'bg-slate-100 border-slate-300 text-slate-900 font-semibold' : 'bg-sand-50 border-sand-200 text-sand-800'
             }`}
           >
             <span>{item.label}</span>
             <span>{checked[item.id] ? 'Reviewed ✓' : '◯'}</span>
-          </div>
+          </button>
         ))}
       </div>
 
