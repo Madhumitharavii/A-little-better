@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTodayCare } from './useTodayCare';
+import { useCareDay } from './useCareDay';
+import { addDays } from '@/db/dateUtils';
 import { useStreaks } from './useStreaks';
 import { playSoftChime } from '@/shared/utils/sound';
 import type { ToolId } from '@/features/toolbox/types';
@@ -49,6 +51,12 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
     saveEveningNotes,
   } = useTodayCare();
   const streaks = useStreaks();
+  // Care for Me can also be ticked for yesterday (done just before midnight, ticked just after).
+  const yesterday = addDays(date, -1);
+  const [careDate, setCareDate] = useState<string | null>(null);
+  const onYesterday = careDate === yesterday;
+  const yesterdayCare = useCareDay(yesterday);
+  const care = onYesterday ? yesterdayCare : { findEntry, toggleDone, addMinutes, markSkipped };
 
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [skipTarget, setSkipTarget] = useState<CareItemKey | null>(null);
@@ -93,17 +101,19 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
 
       <div className="xl:col-span-4 xl:col-start-1 xl:row-start-3 xl:row-span-2">
         <CareForMeSection
-          findEntry={(key) => findEntry(key as CareItemKey)}
+          day={onYesterday ? 'yesterday' : 'today'}
+          onDayChange={(d) => setCareDate(d === 'yesterday' ? yesterday : null)}
+          findEntry={(key) => care.findEntry(key as CareItemKey)}
           onToggleDone={(key) => {
-            if (!toggleDone(key as CareItemKey)) {
-              showToast('Your minutes stay logged for today, so this stays ticked.');
+            if (!care.toggleDone(key as CareItemKey)) {
+              showToast(`Your minutes stay logged for ${onYesterday ? 'yesterday' : 'today'}, so this stays ticked.`);
               return;
             }
             chime();
           }}
           onRequestSkip={(key) => setSkipTarget(key as CareItemKey)}
           onAddReadingMinutes={(mins) => {
-            addMinutes('reading', mins);
+            care.addMinutes('reading', mins);
             chime();
           }}
           onOpenFocusTimer={() => openTool('focusTimer')}
@@ -148,7 +158,7 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
         <SkipReasonModal
           onClose={() => setSkipTarget(null)}
           onConfirm={(reason) => {
-            markSkipped(skipTarget, reason);
+            care.markSkipped(skipTarget, reason);
             setSkipTarget(null);
           }}
         />

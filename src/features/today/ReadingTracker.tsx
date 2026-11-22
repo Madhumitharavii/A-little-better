@@ -12,6 +12,8 @@ interface ReadingTrackerProps {
   onAddMinutes: (minutes: number) => void;
   onToggleDone: () => void;
   showToast: (msg: string) => void;
+  /** 'today', or 'yesterday' when ticking for the day before. */
+  dayWord?: string;
 }
 
 /**
@@ -20,7 +22,7 @@ interface ReadingTrackerProps {
  * toward a "Read N books" vision goal — and, with nothing on the go,
  * helps pick one from Want to Read.
  */
-export default function ReadingTracker({ entry, onAddMinutes, onToggleDone, showToast }: ReadingTrackerProps) {
+export default function ReadingTracker({ entry, onAddMinutes, onToggleDone, showToast, dayWord = 'today' }: ReadingTrackerProps) {
   const isDone = entry?.status === 'done';
   const minutes = entry?.valueMinutes ?? 0;
   const books = useLifeItemsOfType('book') as BookItem[];
@@ -70,7 +72,7 @@ export default function ReadingTracker({ entry, onAddMinutes, onToggleDone, show
           <div className="min-w-0">
             <p className="text-sm font-semibold text-sand-900">Reading</p>
             <p className="text-[11px] text-sand-800/60">
-              {minutes} mins today
+              {minutes} mins {dayWord}
               {target ? ` · ${booksFinishedIn(books, year)} of ${target} books this year` : ''}
             </p>
           </div>

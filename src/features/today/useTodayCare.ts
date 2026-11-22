@@ -1,13 +1,7 @@
 import { useToday } from '@/shared/hooks/useToday';
 import { useLiveQuery } from 'dexie-react-hooks';
-import {
-  getDailyCare,
-  saveCareEntry,
-  addMinutesToCareEntry,
-  clearCareEntry,
-} from '@/db/repositories/careRepository';
 import { getDailyReflection, saveDailyReflection } from '@/db/repositories/reflectionRepository';
-import type { CareEntry, CareItemKey } from '@/db/schema';
+import { useCareDay } from './useCareDay';
 
 /**
  * Everything Today needs for the current local date, read live from
@@ -17,34 +11,8 @@ import type { CareEntry, CareItemKey } from '@/db/schema';
  */
 export function useTodayCare() {
   const date = useToday();
-
-  const careEntries = useLiveQuery(() => getDailyCare(date), [date]) ?? [];
+  const care = useCareDay(date);
   const reflection = useLiveQuery(() => getDailyReflection(date), [date]);
-
-  const findEntry = (itemKey: CareItemKey): CareEntry | undefined =>
-    careEntries.find((e) => e.itemKey === itemKey);
-
-  const markDone = (itemKey: CareItemKey) => saveCareEntry({ date, itemKey, status: 'done' });
-
-  const markSkipped = (itemKey: CareItemKey, reason: string) =>
-    saveCareEntry({ date, itemKey, status: 'skipped', skipReason: reason });
-
-  const clearItem = (itemKey: CareItemKey) => clearCareEntry(date, itemKey);
-
-  /** Returns false when it refused to untick (reading/focus with minutes logged — unticking would delete them). */
-  const toggleDone = (itemKey: CareItemKey): boolean => {
-    const existing = findEntry(itemKey);
-    if (existing?.status === 'done') {
-      if ((itemKey === 'reading' || itemKey === 'focus') && (existing.valueMinutes ?? 0) > 0) return false;
-      clearItem(itemKey);
-    } else {
-      markDone(itemKey);
-    }
-    return true;
-  };
-
-  const addMinutes = (itemKey: Extract<CareItemKey, 'reading' | 'focus'>, minutes: number) =>
-    addMinutesToCareEntry(date, itemKey, minutes);
 
   const saveReflectionField = (field: 'gratitude' | 'smallWin', value: string) =>
     saveDailyReflection(date, { [field]: value });
@@ -57,16 +25,5 @@ export function useTodayCare() {
       eveningDone: true,
     });
 
-  return {
-    date,
-    careEntries,
-    reflection,
-    findEntry,
-    markDone,
-    markSkipped,
-    toggleDone,
-    addMinutes,
-    saveReflectionField,
-    saveEveningNotes,
-  };
+  return { ...care, date, reflection, saveReflectionField, saveEveningNotes };
 }

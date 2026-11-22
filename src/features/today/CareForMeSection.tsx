@@ -21,6 +21,9 @@ const readCollapsed = () => {
 };
 
 interface CareForMeSectionProps {
+  /** Which day the ticks go on — yesterday is there for things done just before midnight. */
+  day: 'today' | 'yesterday';
+  onDayChange: (day: 'today' | 'yesterday') => void;
   findEntry: (itemKey: (typeof BASIC_ITEMS)[number]['id'] | 'reading' | 'focus') => CareEntry | undefined;
   onToggleDone: (itemKey: string) => void;
   onRequestSkip: (itemKey: string) => void;
@@ -30,6 +33,8 @@ interface CareForMeSectionProps {
 }
 
 export default function CareForMeSection({
+  day,
+  onDayChange,
   findEntry,
   onToggleDone,
   onRequestSkip,
@@ -49,7 +54,11 @@ export default function CareForMeSection({
     });
   };
 
-  // Today at a glance: the three basics, reading and focus.
+  const onYesterday = day === 'yesterday';
+  // In the small hours, a gentle pointer to yesterday.
+  const lateNight = new Date().getHours() < 4;
+
+  // The day at a glance: the three basics, reading and focus.
   const readingMins = findEntry('reading')?.valueMinutes ?? 0;
   const focusMins = findEntry('focus')?.valueMinutes ?? 0;
   const done =
@@ -57,6 +66,7 @@ export default function CareForMeSection({
     (findEntry('reading')?.status === 'done' || readingMins > 0 ? 1 : 0) +
     (focusMins > 0 ? 1 : 0);
   const total = BASIC_ITEMS.length + 2;
+  const dayWord = onYesterday ? 'yesterday' : 'today';
   const summary = [`${done} of ${total}`, readingMins ? `${readingMins}m reading` : '', focusMins ? `${focusMins}m focus` : ''].filter(Boolean).join(' · ');
 
   return (
@@ -71,7 +81,7 @@ export default function CareForMeSection({
         </h3>
         <span className="flex items-center gap-2 shrink-0">
           <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium ${done === total ? 'bg-sage-500 text-white' : 'bg-sand-100 text-sand-800'}`}>
-            {collapsed ? summary : `${done} of ${total} today`}
+            {collapsed ? (onYesterday ? `${summary} · yesterday` : summary) : `${done} of ${total} ${dayWord}`}
           </span>
           <span className={`text-sand-800/50 text-xs transition-transform ${collapsed ? '' : 'rotate-180'}`} aria-hidden>
             ▾
@@ -81,6 +91,26 @@ export default function CareForMeSection({
 
       {!collapsed && (
         <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div role="group" aria-label="Which day" className="inline-flex p-0.5 bg-sand-100 rounded-xl text-[11px] font-semibold">
+              {(['yesterday', 'today'] as const).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => onDayChange(d)}
+                  aria-pressed={day === d}
+                  className={`px-3 py-1 rounded-lg transition-all ${day === d ? 'bg-white text-sand-900 shadow-sm' : 'text-sand-800/60 hover:text-sand-900'}`}
+                >
+                  {d === 'today' ? 'Today' : 'Yesterday'}
+                </button>
+              ))}
+            </div>
+            {onYesterday ? (
+              <span className="text-[11px] text-sand-800/60 text-right">Ticking for yesterday</span>
+            ) : (
+              lateNight && <span className="text-[11px] text-sand-800/60 text-right">Still up? Last night's go on Yesterday.</span>
+            )}
+          </div>
+
           {BASIC_ITEMS.map((item) => (
             <CareItemRow
               key={item.id}
@@ -98,9 +128,11 @@ export default function CareForMeSection({
             onAddMinutes={onAddReadingMinutes}
             onToggleDone={() => onToggleDone('reading')}
             showToast={showToast}
+            dayWord={dayWord}
           />
 
-          <FocusTimerCard entry={findEntry('focus')} onOpen={onOpenFocusTimer} />
+          {/* The focus timer runs now, so it only logs to today. */}
+          {!onYesterday && <FocusTimerCard entry={findEntry('focus')} onOpen={onOpenFocusTimer} />}
         </div>
       )}
     </section>
