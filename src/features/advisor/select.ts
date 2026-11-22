@@ -66,7 +66,41 @@ export function saveHistory(history: AdvisorHistory): void {
 const SEEN_KEY = 'alb.advisor.seen';
 const seenListeners = new Set<() => void>();
 
-function readSeen(): { date: string; keys: string[] } | null {
+export type SeenToday = { date: string; keys: string[] };
+
+/** Combines advice history from two devices: latest date wins per item, per dismissal, and for today's picks. */
+export function mergeHistory(a: AdvisorHistory, b: AdvisorHistory): AdvisorHistory {
+  const shown = { ...a.shown };
+  for (const [k, v] of Object.entries(b.shown ?? {})) if (!shown[k] || v.date > shown[k].date) shown[k] = v;
+  const dismissed = { ...a.dismissed };
+  for (const [k, v] of Object.entries(b.dismissed ?? {})) if (!dismissed[k] || v > dismissed[k]) dismissed[k] = v;
+  const today = !a.today ? b.today : b.today && b.today.date > a.today.date ? b.today : a.today;
+  return { shown, dismissed, today };
+}
+
+/** Combines "seen" from two devices: same day → both sets of keys; otherwise the later day. */
+export function mergeSeen(a: SeenToday | null, b: SeenToday | null): SeenToday | null {
+  if (!a || !b) return a ?? b;
+  if (a.date === b.date) return { date: a.date, keys: Array.from(new Set([...a.keys, ...b.keys])) };
+  return a.date > b.date ? a : b;
+}
+
+export function getSeen(): SeenToday | null {
+  return readSeen();
+}
+
+/** Replaces what's been seen on this device (used when it came from another device). */
+export function applySeen(seen: SeenToday | null): void {
+  try {
+    if (seen) localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+    else localStorage.removeItem(SEEN_KEY);
+  } catch {
+    // Not saved — fine.
+  }
+  for (const listener of seenListeners) listener();
+}
+
+function readSeen(): SeenToday | null {
   try {
     const raw = localStorage.getItem(SEEN_KEY);
     return raw ? JSON.parse(raw) : null;

@@ -9,6 +9,7 @@ import { collectDocuments, textHash, type AiDocument } from './documents';
 import { computeThemes, emotionThemeCounts, emotionsByDoc, emotionTrend, weekSentences, type EmotionWeek, type JournalTheme, type WeekSentence } from './analysis';
 import { classifyEmotionWithHead, dot, mean, normalize, scoreTags, STARTER_TAGS, summarise, THEME_NAMES, topK, type Emotion, type Scored, type SoftmaxModel, type Vector } from './ml';
 import emotionHeadJson from './emotionHead.json';
+import { writePref } from '@/db/repositories/syncedPrefs';
 
 const emotionHead = emotionHeadJson as unknown as SoftmaxModel & { minConfidence: number };
 
@@ -32,7 +33,14 @@ export function isAiEnabled(): boolean {
   }
 }
 
+/** Turns on-device AI on or off here — and, through sync, on your other devices too. */
 export function setAiEnabled(on: boolean): void {
+  applyAiEnabled(on);
+  void writePref('aiEnabled', on);
+}
+
+/** Applies the switch on this device only (used when the change came from another device). */
+export function applyAiEnabled(on: boolean): void {
   try {
     localStorage.setItem(ENABLED_KEY, on ? '1' : '0');
   } catch {

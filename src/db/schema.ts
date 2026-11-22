@@ -373,6 +373,23 @@ export interface ToolEvent {
  * lifeItems table (like study rows) so every device sees the same taps.
  * The old local-only `toolEvents` table is only read once, to move its rows here.
  */
+/**
+ * A small preference that should be the same on every device (the
+ * On-device AI switch, Noticed-for-You history, a running study timer),
+ * stored as a row of the synced lifeItems table. If two devices ever
+ * create one at the same time, the newest row wins.
+ */
+export interface SyncedPrefItem {
+  id: string;
+  type: 'pref';
+  title: string;
+  key: string;
+  value: unknown;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
 export interface ToolEventItem extends ToolEvent {
   type: 'toolEvent';
   title: string;

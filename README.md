@@ -135,6 +135,7 @@ When configured and signed in, data syncs between my own devices through Supabas
 - **Last-write-wins per row**, using each record's own `updatedAt`.
 - **Two clocks, never mixed** — pushes compare against this device's clock; pulls use per-table cursors on the **server-assigned** `synced_at`, so a device with a wrong clock can't miss another device's changes. A small overlap window catches late-committing writes.
 - **Deletes propagate** — soft deletes for most tables; tombstones for tables that hard-delete locally (care entries, images), plus Storage cleanup for photos.
+- **Preferences follow you too** — the On-device AI switch, Noticed-for-You history (what was shown, "Not helpful", what's been read), a running study timer and "I'm bored" taps travel as small typed rows in the synced `life_items` table, so no extra database tables are needed. Advice history from two devices is merged, not overwritten. Only truly per-device things stay local: the downloaded model and its embeddings, and whether Care for Me is folded.
 - **Duplicate resolution** — if the same care item is ticked on two devices before syncing, the newer record wins everywhere.
 - Study subjects and sessions reuse the existing `life_items` table (fields in a JSONB payload), so the feature needed no schema migration; each study session is its own row, so concurrent logging on two devices can't overwrite either.
 
@@ -187,7 +188,7 @@ npm run eval    # just the emotion-classifier evaluation
 npm run train:emotion   # retrain the emotion head (writes src/features/ai/emotionHead.json)
 ```
 
-The suites run the real sync engine against an in-memory database and a mock Supabase that assigns its own server timestamps — covering first sync, conflicts, delete propagation, duplicate resolution, clock skew, error messages, and paging past Supabase's 1000-row limit — plus the Letterboxd and Goodreads importers (rewatch grouping, review matching, shelves, re-run safety), the advisor's rules and non-repetition, the study log, weekly goals, the daily-thought rotation, the ML maths (clustering, silhouette, keywords, emotion prototypes, softmax regression), and the real on-device model (meaning search, emotion reading — including negation like "didn't cry" — and theme grouping).
+The suites run the real sync engine against an in-memory database and a mock Supabase that assigns its own server timestamps — covering first sync, conflicts, delete propagation, duplicate resolution, clock skew, error messages, and paging past Supabase's 1000-row limit, and synced preferences — plus the Letterboxd and Goodreads importers (rewatch grouping, review matching, shelves, re-run safety), the advisor's rules and non-repetition, the study log, weekly goals, the daily-thought rotation, the ML maths (clustering, silhouette, keywords, emotion prototypes, softmax regression), and the real on-device model (meaning search, emotion reading — including negation like "didn't cry" — and theme grouping).
 
 ## Data & Privacy
 

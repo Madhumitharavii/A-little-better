@@ -16,14 +16,14 @@ function useAdvisorData(): AdvisorData | undefined {
       db.lifeItems.toArray(),
       db.people.toArray(),
     ]);
-    // The lifeItems table also holds study rows and "I'm bored" taps — split them out.
+    // The lifeItems table also holds study rows, "I'm bored" taps and synced preferences — split them out.
     const rows = life.filter((i) => !i.deletedAt) as unknown as Array<{ type: string }>;
     return {
       today: getLocalDateKey(),
       care,
       journal: journal.filter((j) => !j.deletedAt),
       reflections,
-      life: rows.filter((i) => i.type !== 'subject' && i.type !== 'studySession' && i.type !== 'toolEvent') as unknown as AdvisorData['life'],
+      life: rows.filter((i) => i.type !== 'subject' && i.type !== 'studySession' && i.type !== 'toolEvent' && i.type !== 'pref') as unknown as AdvisorData['life'],
       people: people.filter((p) => !p.deletedAt),
       toolEvents: rows.filter((i) => i.type === 'toolEvent') as unknown as AdvisorData['toolEvents'],
       subjects: rows.filter((i) => i.type === 'subject') as unknown as AdvisorData['subjects'],

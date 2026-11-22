@@ -39,6 +39,22 @@ function write(timer: RunningStudyTimer | null) {
 
 let memory: RunningStudyTimer | null = read();
 
+export function getStudyTimer(): RunningStudyTimer | null {
+  return memory;
+}
+
+/** Sets the timer from another device (sync) — same as starting/stopping here, without a new start time. */
+export function applyStudyTimer(timer: RunningStudyTimer | null): void {
+  write(timer);
+}
+
+export function subscribeStudyTimer(listener: (timer: RunningStudyTimer | null) => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 export function startStudyTimer(subjectId: string, topicId?: string) {
   write({ subjectId, topicId, startedAt: new Date().toISOString() });
 }

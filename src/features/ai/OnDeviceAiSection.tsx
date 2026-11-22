@@ -22,7 +22,8 @@ export default function OnDeviceAiSection() {
           <p className="font-semibold text-sand-900 text-xs">🧠 On-device AI</p>
           <p className="text-[11px] text-sand-800/60 mt-0.5">
             Search your writing by meaning, see your journal themes, and let Noticed for You understand how you've been feeling. A small
-            language model (about 45 MB, downloaded once from this app) runs entirely on this device — your writing never leaves it.
+            language model runs entirely on your device — your writing never leaves it. This switch applies to all your signed-in
+            devices; each one downloads the model (about 45 MB) once, so open the app on Wi-Fi the first time.
           </p>
         </div>
         <button
