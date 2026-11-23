@@ -20,9 +20,12 @@ import type { BookItem, LifeItemPatch, MovieItem } from '@/db/schema';
 
 const MISSED_KEY = 'alb.covers.missed';
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
-const BATCH = 20;
-const GAP_MS = 1200; // between lookups — gentle on Letterboxd and Open Library
-const PAUSE_MS = 20_000; // between batches
+const FILMS_PER_ROUND = 32;
+const BOOKS_PER_ROUND = 8;
+const FILMS_AT_ONCE = 4;
+const FILM_GAP_MS = 400;
+const BOOK_GAP_MS = 1100; // gentle on Open Library
+const PAUSE_MS = 3000; // between batches
 
 type Missed = Record<string, number>;
 function readMissed(): Missed {
@@ -67,7 +70,7 @@ export function candidates(rows: readonly { type: string }[], missed: Missed, no
   return out.sort((a, b) => when(b).localeCompare(when(a)));
 }
 
-async function moviePoster(m: MovieItem): Promise<string | null | 'retry'> {
+export async function moviePoster(m: MovieItem): Promise<string | null | 'retry'> {
   const res = await fetch(`/api/feed?source=letterboxd-poster&uri=${encodeURIComponent(m.letterboxdUri!)}`);
   if (res.status === 400) return null;
   if (!res.ok) return 'retry';
@@ -111,27 +114,39 @@ async function fillSome(): Promise<void> {
       const rows = getLifeRows();
       if (!rows) break;
       const missed = readMissed();
-      const todo = candidates(rows, missed).slice(0, BATCH);
-      if (!todo.length) break;
+      const all = candidates(rows, missed);
+      // Each round: a handful of films and a few books, so neither waits on the other.
+      const films = all.filter((c) => c.kind === 'movie').slice(0, FILMS_PER_ROUND);
+      const books = all.filter((c) => c.kind === 'book').slice(0, BOOKS_PER_ROUND);
+      if (!films.length && !books.length) break;
       const updates: { id: string; patch: LifeItemPatch }[] = [];
-      for (const c of todo) {
-        if (document.visibilityState !== 'visible') break;
+      const lookUp = async (c: Candidate) => {
+        if (document.visibilityState !== 'visible' || failures >= 3) return;
         let found: string | null | 'retry';
         try {
           found = c.kind === 'movie' ? await moviePoster(c.item) : await bookCover(c.item);
         } catch {
           found = 'retry';
         }
-        if (found === 'retry') {
-          failures++;
-          if (failures >= 3) break;
-        } else if (found) {
-          updates.push({ id: c.item.id, patch: c.kind === 'movie' ? { type: 'movie', posterUrl: found } : { type: 'book', coverUrl: found } });
-        } else {
-          missed[c.item.id] = Date.now();
-        }
-        await sleep(GAP_MS);
-      }
+        if (found === 'retry') failures++;
+        else if (found) updates.push({ id: c.item.id, patch: c.kind === 'movie' ? { type: 'movie', posterUrl: found } : { type: 'book', coverUrl: found } });
+        else missed[c.item.id] = Date.now();
+      };
+      // Films go through the app's own relay (cached), a few at a time; books go to Open Library one by one.
+      await Promise.all([
+        (async () => {
+          for (let i = 0; i < films.length; i += FILMS_AT_ONCE) {
+            await Promise.all(films.slice(i, i + FILMS_AT_ONCE).map(lookUp));
+            await sleep(FILM_GAP_MS);
+          }
+        })(),
+        (async () => {
+          for (const b of books) {
+            await lookUp(b);
+            await sleep(BOOK_GAP_MS);
+          }
+        })(),
+      ]);
       saveMissed(missed);
       // One write per batch, and only when the item still has no picture (you may have added one meanwhile).
       const latest = new Map((getLifeRows() ?? []).map((r) => [r.id, r as unknown as MovieItem | BookItem]));
@@ -150,7 +165,7 @@ async function fillSome(): Promise<void> {
 export function startCoverFill(): void {
   if (import.meta.env.MODE === 'test') return;
   const kick = () => void fillSome();
-  window.setTimeout(kick, 25_000);
+  window.setTimeout(kick, 15_000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') window.setTimeout(kick, 5000);
   });

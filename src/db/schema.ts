@@ -182,6 +182,8 @@ export interface MovieItem extends LifeItemBase {
   lists?: MovieListEntry[];
   /** Set to 'letterboxd' for rows brought in via the diary CSV importer. */
   source?: 'manual' | 'letterboxd';
+  /** The day "Pick for me" chose this film (YYYY-MM-DD) — one pick a day, no re-rolls. */
+  pickedOn?: string;
 }
 
 /**

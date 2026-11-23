@@ -8,6 +8,7 @@ import MovieCard from './MovieCard';
 import MovieEditorModal from './MovieEditorModal';
 import MovieDetailModal from './MovieDetailModal';
 import LetterboxdImportModal from './LetterboxdImportModal';
+import PickForMeModal from './PickForMeModal';
 
 interface MoviesPageProps {
   showToast: (msg: string) => void;
@@ -31,6 +32,7 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
   const [editing, setEditing] = useState<'closed' | 'new' | MovieItem>('closed');
   const [detail, setDetail] = useState<MovieItem | null>(initialOpenItem ?? null);
   const [importing, setImporting] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [list, setList] = useState<string | null>(null);
   const [visible, setVisible] = useState(PAGE);
 
@@ -93,6 +95,12 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
         </button>
         <h2 className="serif text-xl font-semibold text-sand-900">Movies</h2>
         <div className="ml-auto flex gap-2">
+          <button
+            onClick={() => setPicking(true)}
+            className="px-3 py-2 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl"
+          >
+            🎲 Pick for me
+          </button>
           <button
             onClick={() => setImporting(true)}
             className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-2xl"
@@ -216,6 +224,17 @@ export default function MoviesPage({ showToast, onBack, initialOpenItem }: Movie
               setDetail(updated);
               showToast('New watch logged — your last one is saved in history 🎬');
             }
+          }}
+        />
+      )}
+
+      {picking && (
+        <PickForMeModal
+          movies={movies}
+          onClose={() => setPicking(false)}
+          onOpenMovie={(m) => {
+            setPicking(false);
+            setDetail(m);
           }}
         />
       )}
