@@ -59,10 +59,10 @@ describe('book covers', () => {
     const rows = [
       { id: 'a', type: 'book', title: 'Old', dateFinished: '2020-01-01', updatedAt: '2020' },
       { id: 'b', type: 'book', title: 'New', dateFinished: '2026-01-01', updatedAt: '2026' },
-      { id: 'c', type: 'book', title: 'Has photo', coverImageId: 'x', updatedAt: '2026' },
+      { id: 'c', type: 'book', title: 'Has photo', coverImageId: 'x', genres: [], updatedAt: '2026' },
       { id: 'd', type: 'movie', title: 'No link', updatedAt: '2026' },
       { id: 'e', type: 'movie', title: 'Linked', letterboxdUri: 'https://boxd.it/x', dateWatched: '2025-01-01', updatedAt: '2025' },
-      { id: 'f', type: 'book', title: 'Missed', updatedAt: '2026' },
+      { id: 'f', type: 'book', title: 'Missed', genres: [], updatedAt: '2026' },
     ];
     const now = Date.parse('2026-11-23T00:00:00Z');
     expect(candidates(rows, { f: now - 1000 }, now).map((c) => c.item.id)).toEqual(['b', 'e', 'a']);

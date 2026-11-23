@@ -7,6 +7,7 @@ import BookCard from './BookCard';
 import BookEditorModal from './BookEditorModal';
 import BookDetailModal from './BookDetailModal';
 import GoodreadsImportModal from './GoodreadsImportModal';
+import BookPickModal from './BookPickModal';
 
 interface BooksPageProps {
   showToast: (msg: string) => void;
@@ -29,6 +30,7 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
   const [editing, setEditing] = useState<'closed' | 'new' | BookItem>('closed');
   const [detail, setDetail] = useState<BookItem | null>(initialOpenItem ?? null);
   const [importing, setImporting] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [shelf, setShelf] = useState<string | null>(null);
   const sortedBooks = useMemo(() => [...books].sort(byLatest), [books]);
   const [visible, setVisible] = useState(PAGE);
@@ -70,12 +72,18 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button onClick={onBack} className="text-sand-800/60 hover:text-sand-900 text-sm px-1">
           ← Life
         </button>
         <h2 className="serif text-xl font-semibold text-sand-900">Books</h2>
         <div className="ml-auto flex gap-2">
+          <button
+            onClick={() => setPicking(true)}
+            className="px-3 py-2 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl"
+          >
+            🎲 Pick for me
+          </button>
           <button
             onClick={() => setImporting(true)}
             className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-2xl"
@@ -194,6 +202,17 @@ export default function BooksPage({ showToast, onBack, initialOpenItem }: BooksP
               setDetail(updated);
               showToast('New reading started — your last one is saved in history 📖');
             }
+          }}
+        />
+      )}
+
+      {picking && (
+        <BookPickModal
+          books={books}
+          onClose={() => setPicking(false)}
+          onOpenBook={(b) => {
+            setPicking(false);
+            setDetail(b);
           }}
         />
       )}

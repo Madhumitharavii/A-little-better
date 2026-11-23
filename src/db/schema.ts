@@ -135,6 +135,10 @@ export interface BookItem extends LifeItemBase {
   previousReadings?: BookReadingEntry[];
   /** Shelves this book is on (e.g. custom Goodreads shelves). */
   shelves?: string[];
+  /** Genres worked out from Open Library's subjects (lib/bookGenres.ts); [] once looked up and none found. */
+  genres?: string[];
+  /** The day "Pick for me" chose this book (YYYY-MM-DD). */
+  pickedOn?: string;
   /** Where the record came from — 'goodreads' when added by the Goodreads CSV import (books/goodreadsImport.ts). */
   source?: 'manual' | 'goodreads';
 }

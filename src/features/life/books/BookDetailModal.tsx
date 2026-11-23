@@ -62,6 +62,15 @@ export default function BookDetailModal({ book, onClose, onEdit, onToggleFavorit
               ))}
             </div>
           )}
+          {!!book.genres?.length && (
+            <div className="flex flex-wrap gap-1">
+              {book.genres.map((g) => (
+                <span key={g} className="text-[10px] bg-sand-100 text-sand-800 px-2 py-0.5 rounded-full">
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

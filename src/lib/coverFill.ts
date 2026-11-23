@@ -1,6 +1,7 @@
 import { getLifeRows, subscribeLifeRows } from '@/db/lifeStore';
 import { bulkUpdateLifeItems } from '@/db/repositories/lifeRepository';
 import type { BookItem, LifeItemPatch, MovieItem } from '@/db/schema';
+import { genresFrom } from './bookGenres';
 
 /**
  * Fills in posters and covers for films and books that don't have one yet,
@@ -61,9 +62,10 @@ export function candidates(rows: readonly { type: string }[], missed: Missed, no
   const recent = (m: Missed[string] | undefined) => m !== undefined && now - m < RETRY_AFTER_MS;
   const out: Candidate[] = [];
   for (const r of rows as Array<MovieItem | BookItem>) {
-    if (r.deletedAt || recent(missed[r.id])) continue;
-    if (r.type === 'movie' && !r.posterUrl && !r.posterImageId && r.letterboxdUri) out.push({ kind: 'movie', item: r });
-    if (r.type === 'book' && !r.coverUrl && !r.coverImageId && r.title.trim()) out.push({ kind: 'book', item: r });
+    if (r.deletedAt) continue;
+    if (r.type === 'movie' && !recent(missed[r.id]) && !r.posterUrl && !r.posterImageId && r.letterboxdUri) out.push({ kind: 'movie', item: r });
+    if (r.type === 'book' && r.title.trim() && (r.genres === undefined || (!r.coverUrl && !r.coverImageId && !recent(missed[r.id]))))
+      out.push({ kind: 'book', item: r });
   }
   const when = (c: Candidate) =>
     c.kind === 'movie' ? c.item.dateWatched ?? c.item.updatedAt : c.item.dateFinished ?? c.item.dateStarted ?? c.item.updatedAt;
@@ -78,29 +80,44 @@ export async function moviePoster(m: MovieItem): Promise<string | null | 'retry'
   return body.poster ?? null;
 }
 
+type OlDoc = { title?: string; cover_i?: number; subject?: string[] };
+const coverLink = (id: number) => `https://covers.openlibrary.org/b/id/${id}-M.jpg`;
+const titleMatches = (d: OlDoc, want: string) => {
+  if (!d.title) return false;
+  const t = plainTitle(d.title);
+  return t === want || t.startsWith(want) || want.startsWith(t);
+};
+
 /** The first Open Library result whose title matches ours (so we never show some other book's cover). */
-export function pickCover(docs: { title?: string; cover_i?: number }[], title: string): string | null {
+export function pickCover(docs: OlDoc[], title: string): string | null {
   const want = plainTitle(title);
-  const hit = docs.find((d) => d.cover_i && d.title && (plainTitle(d.title) === want || plainTitle(d.title).startsWith(want) || want.startsWith(plainTitle(d.title))));
-  return hit ? `https://covers.openlibrary.org/b/id/${hit.cover_i}-M.jpg` : null;
+  const hit = docs.find((d) => d.cover_i && titleMatches(d, want));
+  return hit ? coverLink(hit.cover_i!) : null;
 }
 
-async function bookCover(b: BookItem): Promise<string | null | 'retry'> {
-  const base = 'https://openlibrary.org/search.json?limit=5&fields=title,cover_i';
+type BookInfo = { cover: string | null; genres: string[] };
+
+/** A cover and genres for a book, from Open Library — by ISBN first, then title + author. */
+export async function bookInfo(b: BookItem): Promise<BookInfo | 'retry'> {
+  const base = 'https://openlibrary.org/search.json?limit=5&fields=title,cover_i,subject';
   const tries = [
     b.isbn ? `${base}&isbn=${encodeURIComponent(b.isbn)}` : null,
     `${base}&title=${encodeURIComponent(plainTitle(b.title))}${b.author ? `&author=${encodeURIComponent(b.author)}` : ''}`,
   ].filter((u): u is string => !!u);
+  let genres: string[] | undefined;
+  const want = plainTitle(b.title);
   for (const url of tries) {
     const res = await fetch(url);
     if (!res.ok) return 'retry';
-    const docs = ((await res.json()) as { docs?: { title?: string; cover_i?: number }[] }).docs ?? [];
+    const docs = ((await res.json()) as { docs?: OlDoc[] }).docs ?? [];
     // An ISBN match is the exact book, whatever its title says.
-    const byIsbn = url.includes('&isbn=') ? docs.find((d) => d.cover_i) : undefined;
-    const found = byIsbn ? `https://covers.openlibrary.org/b/id/${byIsbn.cover_i}-M.jpg` : pickCover(docs, b.title);
-    if (found) return found;
+    const isbn = url.includes('&isbn=');
+    const withCover = isbn ? docs.find((d) => d.cover_i) : docs.find((d) => d.cover_i && titleMatches(d, want));
+    const any = withCover ?? (isbn ? docs[0] : docs.find((d) => titleMatches(d, want)));
+    if (!genres?.length && any?.subject?.length) genres = genresFrom(any.subject);
+    if (withCover) return { cover: coverLink(withCover.cover_i!), genres: genres ?? [] };
   }
-  return null;
+  return { cover: null, genres: genres ?? [] };
 }
 
 let running = false;
@@ -122,15 +139,24 @@ async function fillSome(): Promise<void> {
       const updates: { id: string; patch: LifeItemPatch }[] = [];
       const lookUp = async (c: Candidate) => {
         if (document.visibilityState !== 'visible' || failures >= 3) return;
-        let found: string | null | 'retry';
         try {
-          found = c.kind === 'movie' ? await moviePoster(c.item) : await bookCover(c.item);
+          if (c.kind === 'movie') {
+            const found = await moviePoster(c.item);
+            if (found === 'retry') failures++;
+            else if (found) updates.push({ id: c.item.id, patch: { type: 'movie', posterUrl: found } });
+            else missed[c.item.id] = Date.now();
+          } else {
+            const info = await bookInfo(c.item);
+            if (info === 'retry') failures++;
+            else {
+              const hasCover = c.item.coverUrl || c.item.coverImageId;
+              if (!info.cover && !hasCover) missed[c.item.id] = Date.now();
+              updates.push({ id: c.item.id, patch: { type: 'book', genres: info.genres, ...(info.cover && !hasCover ? { coverUrl: info.cover } : {}) } });
+            }
+          }
         } catch {
-          found = 'retry';
+          failures++;
         }
-        if (found === 'retry') failures++;
-        else if (found) updates.push({ id: c.item.id, patch: c.kind === 'movie' ? { type: 'movie', posterUrl: found } : { type: 'book', coverUrl: found } });
-        else missed[c.item.id] = Date.now();
       };
       // Films go through the app's own relay (cached), a few at a time; books go to Open Library one by one.
       await Promise.all([
@@ -148,11 +174,17 @@ async function fillSome(): Promise<void> {
         })(),
       ]);
       saveMissed(missed);
-      // One write per batch, and only when the item still has no picture (you may have added one meanwhile).
-      const latest = new Map((getLifeRows() ?? []).map((r) => [r.id, r as unknown as MovieItem | BookItem]));
-      const still = updates.filter((u) => {
+            const latest = new Map((getLifeRows() ?? []).map((r) => [r.id, r as unknown as MovieItem | BookItem]));
+      // Never replace a picture you added meanwhile, or genres already there.
+      const still = updates.flatMap((u) => {
         const r = latest.get(u.id);
-        return r && (r.type === 'movie' ? !r.posterUrl && !r.posterImageId : r.type === 'book' ? !r.coverUrl && !r.coverImageId : false);
+        if (!r) return [];
+        if (r.type === 'movie') return !r.posterUrl && !r.posterImageId ? [u] : [];
+        if (r.type !== 'book' || u.patch.type !== 'book') return [];
+        const patch: LifeItemPatch = { type: 'book' };
+        if (u.patch.coverUrl && !r.coverUrl && !r.coverImageId) patch.coverUrl = u.patch.coverUrl;
+        if (r.genres === undefined) patch.genres = u.patch.genres;
+        return patch.coverUrl || patch.genres ? [{ id: u.id, patch }] : [];
       });
       if (still.length) await bulkUpdateLifeItems(still);
       await sleep(PAUSE_MS);
