@@ -34,7 +34,7 @@ export default function BookDetailModal({ book, onClose, onEdit, onToggleFavorit
       <div className="flex gap-4">
         <div className="w-24 h-36 shrink-0 rounded-2xl overflow-hidden bg-sand-100 flex items-center justify-center">
           {coverUrl || book.coverUrl ? (
-            <img src={coverUrl ?? book.coverUrl} alt="" className="w-full h-full object-cover" />
+            <img src={coverUrl ?? book.coverUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} className="w-full h-full object-cover" />
           ) : (
             <span className="text-3xl">📖</span>
           )}

@@ -56,6 +56,8 @@ export interface LetterboxdFilm {
   seen: boolean;
   lists: MovieListEntry[];
   tags: string[];
+  /** Poster image link (the feed has one per entry; the export has none). */
+  poster?: string;
 }
 
 export interface LetterboxdExport {
@@ -235,7 +237,7 @@ const reviewFromOf = (item: { reviewFrom?: 'letterboxd' | 'app'; source?: string
 
 /** A brand-new movie: the latest watch becomes the top-level fields; earlier ones go into previousWatches. */
 export function filmToNewMovie(f: LetterboxdFilm): NewMovieInput {
-  const base = { type: 'movie' as const, title: f.title, year: f.year, letterboxdUri: f.uri, source: 'letterboxd' as const };
+  const base = { type: 'movie' as const, title: f.title, year: f.year, letterboxdUri: f.uri, posterUrl: f.poster, source: 'letterboxd' as const };
   if (!isWatched(f)) return { ...base, status: 'watchlist' };
   const latest = f.watches[f.watches.length - 1];
   const earlier = f.watches.slice(0, -1);
@@ -312,6 +314,7 @@ export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm, op
     lists: lists.length ? lists : undefined,
     letterboxdUri: existing.letterboxdUri ?? f.uri, // keep the link a film already has (feed and export use different link styles)
     tags: existing.tags?.length ? existing.tags : f.tags.length ? f.tags : undefined,
+    posterUrl: existing.posterUrl ?? (existing.posterImageId ? undefined : f.poster),
   };
   const before = {
     status: existing.status,
@@ -324,6 +327,7 @@ export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm, op
     lists: existing.lists?.length ? existing.lists : undefined,
     letterboxdUri: existing.letterboxdUri,
     tags: existing.tags?.length ? existing.tags : undefined,
+    posterUrl: existing.posterUrl,
   };
   const watchesChanged = JSON.stringify(combined) !== JSON.stringify(current);
   if (!watchesChanged && JSON.stringify(next) === JSON.stringify(before)) return undefined;

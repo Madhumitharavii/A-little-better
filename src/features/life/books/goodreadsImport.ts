@@ -32,6 +32,13 @@ export interface ParsedGoodreadsRow {
   readCount: number;
   favorite: boolean;
   shelves: string[];
+  isbn?: string;
+}
+
+/** Goodreads writes ISBNs as ="9780316769488" (so spreadsheets keep the digits) — or leaves them empty. */
+export function cleanIsbn(raw: string): string | undefined {
+  const digits = raw.replace(/[^0-9Xx]/g, '').toUpperCase();
+  return digits.length === 13 || digits.length === 10 ? digits : undefined;
 }
 
 export function normalizeDate(raw: string | undefined): string | undefined {
@@ -102,6 +109,7 @@ export function parseGoodreadsCsv(csvText: string): ParsedGoodreadsRow[] {
       readCount,
       favorite: shelvesRaw.some(isFavoritesShelf),
       shelves,
+      isbn: cleanIsbn(get(cells, 'isbn13')) ?? cleanIsbn(get(cells, 'isbn')),
     });
   }
   return parsed;
@@ -131,6 +139,7 @@ export function rowToBookInput(row: ParsedGoodreadsRow): NewBookInput {
     favorite: row.favorite || undefined,
     shelves: row.shelves.length ? row.shelves : undefined,
     previousReadings: earlierReadings(row),
+    isbn: row.isbn,
     source: 'goodreads',
   };
 }
@@ -155,6 +164,7 @@ export function mergeRowIntoExisting(existing: BookItem, row: ParsedGoodreadsRow
   if (!existing.favorite && row.favorite) patch.favorite = true;
   const shelves = [...new Set([...(existing.shelves ?? []), ...row.shelves])];
   if (shelves.length > (existing.shelves?.length ?? 0)) patch.shelves = shelves;
+  if (!existing.isbn && row.isbn) patch.isbn = row.isbn;
   if (!existing.previousReadings?.length && row.status === 'finished' && row.readCount > 1) patch.previousReadings = earlierReadings(row);
   return Object.keys(patch).length ? ({ type: 'book', ...patch } as LifeItemPatch) : undefined;
 }

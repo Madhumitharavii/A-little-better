@@ -21,7 +21,7 @@ export default function BookCard({ book, onClick }: { book: BookItem; onClick: (
         {coverUrl ? (
           <img src={coverUrl} alt="" className="w-full h-full object-cover" />
         ) : book.coverUrl ? (
-          <img src={book.coverUrl} alt="" className="w-full h-full object-cover" />
+          <img src={book.coverUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} className="w-full h-full object-cover" />
         ) : (
           <span className="text-2xl">📖</span>
         )}

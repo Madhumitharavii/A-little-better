@@ -27,6 +27,13 @@ function subtitle(item: LifeItem): string {
   }
 }
 
+/** A cover or poster linked from the web (Letterboxd, Open Library) — used when there's no photo of your own. */
+function linkedImageFor(item: LifeItem): string | undefined {
+  if (item.type === 'book') return item.coverUrl;
+  if (item.type === 'movie' || item.type === 'series') return item.posterUrl;
+  return undefined;
+}
+
 function imageIdFor(item: LifeItem): string | undefined {
   if (item.type === 'book') return item.coverImageId;
   if (item.type === 'movie') return item.posterImageId;
@@ -43,7 +50,7 @@ interface LifeItemMiniCardProps {
 
 export default function LifeItemMiniCard({ item, onClick }: LifeItemMiniCardProps) {
   const meta = TYPE_META[item.type];
-  const thumbUrl = useLifeImageUrl(imageIdFor(item));
+  const thumbUrl = useLifeImageUrl(imageIdFor(item)) ?? linkedImageFor(item);
 
   return (
     <button
@@ -51,7 +58,7 @@ export default function LifeItemMiniCard({ item, onClick }: LifeItemMiniCardProp
       className="w-full flex items-center gap-3 p-3 bg-white rounded-2xl border border-sand-200 hover:border-sand-300 shadow-sm transition-colors text-left"
     >
       <div className="w-11 h-11 shrink-0 rounded-xl overflow-hidden bg-sand-100 flex items-center justify-center text-lg">
-        {thumbUrl ? <img src={thumbUrl} alt="" className="w-full h-full object-cover" /> : meta.icon}
+        {thumbUrl ? <img src={thumbUrl} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} /> : meta.icon}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-sand-900 truncate">{item.title}</p>

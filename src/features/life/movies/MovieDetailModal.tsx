@@ -28,7 +28,7 @@ export default function MovieDetailModal({ movie, onClose, onEdit, onToggleFavor
       <div className="flex gap-4">
         <div className="w-24 h-36 shrink-0 rounded-2xl overflow-hidden bg-sand-100 flex items-center justify-center">
           {posterUrl || movie.posterUrl ? (
-            <img src={posterUrl ?? movie.posterUrl} alt="" className="w-full h-full object-cover" />
+            <img src={posterUrl ?? movie.posterUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} className="w-full h-full object-cover" />
           ) : (
             <span className="text-3xl">🎬</span>
           )}

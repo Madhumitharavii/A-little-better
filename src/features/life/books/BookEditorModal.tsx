@@ -38,6 +38,8 @@ export default function BookEditorModal({ existing, onClose, onSave }: BookEdito
       author: author.trim() || undefined,
       status,
       coverImageId,
+      coverUrl: existing?.coverUrl,
+      isbn: existing?.isbn,
       dateAdded: existing?.dateAdded ?? getLocalDateKey(),
       dateStarted: dateStarted || undefined,
       dateFinished: dateFinished || undefined,

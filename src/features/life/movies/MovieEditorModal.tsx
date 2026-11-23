@@ -38,6 +38,7 @@ export default function MovieEditorModal({ existing, onClose, onSave }: MovieEdi
       favorite,
       tags: existing?.tags,
       letterboxdUri: existing?.letterboxdUri,
+      posterUrl: existing?.posterUrl,
       imdbId: existing?.imdbId,
       tmdbId: existing?.tmdbId,
       source: existing?.source ?? 'manual',

@@ -118,8 +118,10 @@ export interface BookReadingEntry {
 export interface BookItem extends LifeItemBase {
   type: 'book';
   author?: string;
-  /** External cover URL, if the person pastes one in. */
+  /** External cover link — pasted in, or found on Open Library from the title/ISBN. */
   coverUrl?: string;
+  /** ISBN (from a Goodreads import) — helps find the right cover. */
+  isbn?: string;
   /** id into the lifeImages store, if a cover photo was uploaded locally. */
   coverImageId?: string;
   status?: BookStatus;

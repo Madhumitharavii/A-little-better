@@ -23,7 +23,7 @@ export default function SeriesCard({ series, onClick }: { series: SeriesItem; on
         {posterUrl ? (
           <img src={posterUrl} alt="" className="w-full h-full object-cover" />
         ) : series.posterUrl ? (
-          <img src={series.posterUrl} alt="" className="w-full h-full object-cover" />
+          <img src={series.posterUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} className="w-full h-full object-cover" />
         ) : (
           <span className="text-2xl">📺</span>
         )}

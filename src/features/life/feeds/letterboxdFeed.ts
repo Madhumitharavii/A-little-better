@@ -24,6 +24,7 @@ export function parseLetterboxdFeed(xml: string): LetterboxdExport {
       films.set(key, film);
     }
     if (item.memberLike === 'Yes') film.liked = true;
+    film.poster ??= posterFrom(item.description ?? '');
     film.watches.push({
       date: item.watchedDate || undefined,
       rating: item.memberRating ? Number(item.memberRating) : undefined,
@@ -39,4 +40,10 @@ export function parseLetterboxdFeed(xml: string): LetterboxdExport {
 function reviewText(html: string): string | undefined {
   const text = cleanReview(html.replace(/<p>\s*<img[^>]*>\s*<\/p>/gi, '').replace(/<p>\s*<em>\s*This review may contain spoilers\.?\s*<\/em>\s*<\/p>/gi, ''));
   return text || undefined;
+}
+
+/** The poster image in an entry, at card size (Letterboxd's own image host only). */
+export function posterFrom(html: string): string | undefined {
+  const m = html.match(/<img[^>]+src="(https:\/\/a\.ltrbxd\.com\/resized\/[^"]+)"/);
+  return m ? m[1].replace(/&amp;/g, '&').replace(/-0-\d+-0-\d+-crop/, '-0-230-0-345-crop') : undefined;
 }

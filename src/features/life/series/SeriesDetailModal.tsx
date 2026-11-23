@@ -48,7 +48,7 @@ export default function SeriesDetailModal({ series, onClose, onEdit, onToggleFav
       <div className="flex gap-4">
         <div className="w-24 h-36 shrink-0 rounded-2xl overflow-hidden bg-sand-100 flex items-center justify-center">
           {posterUrl || current.posterUrl ? (
-            <img src={posterUrl ?? current.posterUrl} alt="" className="w-full h-full object-cover" />
+            <img src={posterUrl ?? current.posterUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} className="w-full h-full object-cover" />
           ) : (
             <span className="text-3xl">📺</span>
           )}

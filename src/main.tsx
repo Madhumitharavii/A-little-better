@@ -6,6 +6,7 @@ import { keepAppUpdated } from './lib/appUpdates';
 import { migrateLocalToolEvents } from './db/repositories/toolEventRepository';
 import { startPrefSync } from './lib/prefSync';
 import { startFeedSync } from './lib/feedSync';
+import { startCoverFill } from './lib/coverFill';
 import './index.css';
 
 // Runs once, in a normal (writable) Dexie transaction — this is
@@ -16,6 +17,7 @@ void ensureDefaultSettings();
 void migrateLocalToolEvents();
 startPrefSync();
 startFeedSync();
+startCoverFill();
 keepAppUpdated();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

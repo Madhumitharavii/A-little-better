@@ -15,7 +15,7 @@ export default function MovieCard({ movie, onClick }: { movie: MovieItem; onClic
         {posterUrl ? (
           <img src={posterUrl} alt="" className="w-full h-full object-cover" />
         ) : movie.posterUrl ? (
-          <img src={movie.posterUrl} alt="" className="w-full h-full object-cover" />
+          <img src={movie.posterUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} className="w-full h-full object-cover" />
         ) : (
           <span className="text-2xl">🎬</span>
         )}
