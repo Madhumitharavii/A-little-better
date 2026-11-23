@@ -54,7 +54,7 @@ export default function ConnectedAccountsSection({ showToast }: { showToast: (ms
         <p className="font-semibold text-sand-900 text-xs">🔗 Connected accounts</p>
         <p className="text-[11px] text-sand-800/60 mt-0.5 leading-relaxed">
           Keep logging on Letterboxd and Goodreads — new films and books (with ratings, reviews and likes) appear in Life by
-          themselves. One way only, from your public profiles; checked when you open the app and every few hours.
+          themselves. One way only, from your public profiles; checked whenever you open the app.
         </p>
       </div>
 

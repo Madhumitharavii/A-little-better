@@ -33,7 +33,6 @@ export interface FeedSyncResult {
 }
 
 const LAST_KEY = 'alb.feeds.last';
-const CHECK_EVERY_MS = 3 * 60 * 60 * 1000;
 const listeners = new Set<(r: FeedSyncResult | null) => void>();
 let running: Promise<FeedSyncResult | null> | null = null;
 
@@ -141,19 +140,26 @@ export function syncFeeds(): Promise<FeedSyncResult | null> {
 }
 
 /** Background checks: a few seconds after opening, when you come back to the app, and every 3 hours. */
+/**
+ * When to look for new logs: every time the app opens, whenever it comes back
+ * to the front (if the last look was over 10 minutes ago), and every 30 minutes
+ * while it stays open. Each look is one tiny request per connected account.
+ */
+const RECHECK_AFTER_MS = 10 * 60 * 1000;
+const CHECK_WHILE_OPEN_MS = 30 * 60 * 1000;
+
 export function startFeedSync(): void {
-  const due = () => {
+  const dueAfter = (ms: number) => {
     const last = readLast();
-    return !last || Date.now() - Date.parse(last.at) > CHECK_EVERY_MS;
+    return !last || Date.now() - Date.parse(last.at) > ms;
   };
-  const maybe = () => {
-    if (due()) void syncFeeds();
-  };
-  window.setTimeout(maybe, 8000);
+  window.setTimeout(() => void syncFeeds(), 8000);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') maybe();
+    if (document.visibilityState === 'visible' && dueAfter(RECHECK_AFTER_MS)) void syncFeeds();
   });
-  window.setInterval(maybe, CHECK_EVERY_MS);
+  window.setInterval(() => {
+    if (document.visibilityState === 'visible') void syncFeeds();
+  }, CHECK_WHILE_OPEN_MS);
 }
 
 export function useLastFeedSync(): FeedSyncResult | null {
