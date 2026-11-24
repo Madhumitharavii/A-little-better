@@ -14,6 +14,8 @@ import { useAiBackground } from '@/features/ai/aiEngine';
 import LifePage from '@/features/life/LifePage';
 import WeekPage from '@/features/week/WeekPage';
 import { checkReminders } from '@/shared/utils/reminders';
+import { startWaterReminders } from '@/lib/water';
+import { playSoftChime } from '@/shared/utils/sound';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { runSync } from '@/lib/sync/syncEngine';
 import { mergeDuplicateSubjects } from '@/db/repositories/studyRepository';
@@ -77,6 +79,14 @@ export default function App() {
       }),
     [],
   );
+
+  // Drink-water nudges: on opening the app, then every so often while it's open (lib/water.ts).
+  useEffect(() => {
+    startWaterReminders((message) => {
+      showToast(message, 9000);
+      void getSettings().then((s) => playSoftChime(s.soundEnabled));
+    });
+  }, [showToast]);
 
   // Best-effort reminders: checked whenever the app is opened or
   // brought back to the foreground — see shared/utils/reminders.ts

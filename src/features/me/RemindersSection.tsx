@@ -2,10 +2,22 @@ import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { getSettings, saveSettings } from '@/db/repositories/settingsRepository';
 import { getNotificationPermission, requestNotificationPermission } from '@/shared/utils/reminders';
+import { readWaterPrefs, saveWaterPrefs, WATER_DEFAULTS, type WaterPrefs } from '@/lib/water';
+
+const WATER_EVERY = [30, 45, 60, 90, 120];
 
 export default function RemindersSection() {
   const settings = useLiveQuery(() => getSettings(), []);
   const [permission, setPermission] = useState(getNotificationPermission());
+  const [water, setWater] = useState<WaterPrefs>(WATER_DEFAULTS);
+  useEffect(() => {
+    void readWaterPrefs().then(setWater);
+  }, []);
+  const changeWater = (patch: Partial<WaterPrefs>) => {
+    const next = { ...water, ...patch };
+    setWater(next);
+    void saveWaterPrefs(next);
+  };
 
   useEffect(() => {
     setPermission(getNotificationPermission());
@@ -88,6 +100,53 @@ export default function RemindersSection() {
             {settings.morningReminderEnabled ? 'On' : 'Off'}
           </button>
         </div>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-sand-900">💧 Drink water</p>
+            <p className="text-[10px] text-sand-800/60">When you open the app, then every so often while it’s open.</p>
+          </div>
+          <button
+            onClick={() => changeWater({ enabled: !water.enabled })}
+            className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${water.enabled ? 'bg-sage-500 text-white' : 'bg-sand-200 text-sand-800'}`}
+          >
+            {water.enabled ? 'On' : 'Off'}
+          </button>
+        </div>
+        {water.enabled && (
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-sand-800/80">
+            <span>Every</span>
+            <select
+              aria-label="How often to remind you to drink water"
+              value={water.everyMinutes}
+              onChange={(e) => changeWater({ everyMinutes: Number(e.target.value) })}
+              className="text-xs p-1.5 bg-white border border-sand-200 rounded-lg"
+            >
+              {WATER_EVERY.map((m) => (
+                <option key={m} value={m}>
+                  {m < 60 ? `${m} min` : m === 60 ? '1 hour' : `${m / 60} hours`}
+                </option>
+              ))}
+            </select>
+            <span>between</span>
+            <input
+              aria-label="Water reminders from"
+              type="time"
+              value={water.from}
+              onChange={(e) => e.target.value && changeWater({ from: e.target.value })}
+              className="text-xs p-1.5 bg-white border border-sand-200 rounded-lg"
+            />
+            <span>and</span>
+            <input
+              aria-label="Water reminders until"
+              type="time"
+              value={water.until}
+              onChange={(e) => e.target.value && changeWater({ until: e.target.value })}
+              className="text-xs p-1.5 bg-white border border-sand-200 rounded-lg"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -33,7 +33,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   return Notification.requestPermission();
 }
 
-function fireNotification(title: string, body: string): boolean {
+export function fireNotification(title: string, body: string): boolean {
   if (!isNotificationSupported() || Notification.permission !== 'granted') return false;
   try {
     new Notification(title, { body, icon: '/icons/icon-192.png', tag: title });

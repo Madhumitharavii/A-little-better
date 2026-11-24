@@ -21,12 +21,12 @@ import { genresFrom } from './bookGenres';
 
 const MISSED_KEY = 'alb.covers.missed';
 const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
-const FILMS_PER_ROUND = 32;
-const BOOKS_PER_ROUND = 8;
 const FILMS_AT_ONCE = 4;
-const FILM_GAP_MS = 400;
-const BOOK_GAP_MS = 1100; // gentle on Open Library
-const PAUSE_MS = 3000; // between batches
+const FILM_GAP_MS = 300;
+const BOOK_GAP_MS = 400; // plus Open Library's own ~1s answer — about one request a second
+const SAVE_EVERY = 8;
+const SAVE_AFTER_MS = 8000;
+const BACK_OFF_MS = 15_000;
 
 type Missed = Record<string, number>;
 function readMissed(): Missed {
@@ -68,8 +68,10 @@ export function candidates(rows: readonly { type: string }[], missed: Missed, no
       out.push({ kind: 'book', item: r });
   }
   const when = (c: Candidate) =>
-    c.kind === 'movie' ? c.item.dateWatched ?? c.item.updatedAt : c.item.dateFinished ?? c.item.dateStarted ?? c.item.updatedAt;
-  return out.sort((a, b) => when(b).localeCompare(when(a)));
+    c.kind === 'movie' ? c.item.dateWatched ?? c.item.updatedAt : c.item.dateFinished ?? c.item.dateStarted ?? c.item.dateAdded ?? c.item.updatedAt;
+  // Missing pictures first (what you notice); books that only need genres after.
+  const genresOnly = (c: Candidate) => (c.kind === 'book' && (c.item.coverUrl || c.item.coverImageId) ? 1 : 0);
+  return out.sort((a, b) => genresOnly(a) - genresOnly(b) || when(b).localeCompare(when(a)));
 }
 
 export async function moviePoster(m: MovieItem): Promise<string | null | 'retry'> {
@@ -120,78 +122,95 @@ export async function bookInfo(b: BookItem): Promise<BookInfo | 'retry'> {
   return { cover: null, genres: genres ?? [] };
 }
 
-let running = false;
+type Update = { id: string; patch: LifeItemPatch };
 
-async function fillSome(): Promise<void> {
-  if (running) return;
-  running = true;
+/** Saves found pictures/genres — never replacing a picture you added meanwhile, or genres already there. */
+async function save(updates: Update[]) {
+  if (!updates.length) return;
+  const latest = new Map((getLifeRows() ?? []).map((r) => [r.id, r as unknown as MovieItem | BookItem]));
+  const still = updates.flatMap((u) => {
+    const r = latest.get(u.id);
+    if (!r) return [];
+    if (r.type === 'movie') return !r.posterUrl && !r.posterImageId ? [u] : [];
+    if (r.type !== 'book' || u.patch.type !== 'book') return [];
+    const patch: LifeItemPatch = { type: 'book' };
+    if (u.patch.coverUrl && !r.coverUrl && !r.coverImageId) patch.coverUrl = u.patch.coverUrl;
+    if (r.genres === undefined) patch.genres = u.patch.genres;
+    return patch.coverUrl || patch.genres ? [{ id: u.id, patch }] : [];
+  });
+  if (still.length) await bulkUpdateLifeItems(still);
+}
+
+const running = { movie: false, book: false };
+const canWork = () => document.visibilityState === 'visible' && navigator.onLine;
+
+/**
+ * One lane per kind, so films and books never wait on each other: films go
+ * through the app's own (cached) relay a few at a time; books go to Open
+ * Library one at a time (it asks apps to stay around one request a second).
+ * A slow or failed answer just pauses that lane for a bit — it doesn't stop.
+ */
+async function lane(kind: 'movie' | 'book') {
+  if (running[kind]) return;
+  running[kind] = true;
+  const atOnce = kind === 'movie' ? FILMS_AT_ONCE : 1;
+  const gap = kind === 'movie' ? FILM_GAP_MS : BOOK_GAP_MS;
+  const tried = new Set<string>(); // this run — a failed one waits for the next run
+  let pending: Update[] = [];
+  let lastSave = Date.now();
+  let failsInARow = 0;
   try {
-    let failures = 0;
-    while (document.visibilityState === 'visible' && navigator.onLine && failures < 3) {
+    while (canWork()) {
       const rows = getLifeRows();
       if (!rows) break;
       const missed = readMissed();
-      const all = candidates(rows, missed);
-      // Each round: a handful of films and a few books, so neither waits on the other.
-      const films = all.filter((c) => c.kind === 'movie').slice(0, FILMS_PER_ROUND);
-      const books = all.filter((c) => c.kind === 'book').slice(0, BOOKS_PER_ROUND);
-      if (!films.length && !books.length) break;
-      const updates: { id: string; patch: LifeItemPatch }[] = [];
-      const lookUp = async (c: Candidate) => {
-        if (document.visibilityState !== 'visible' || failures >= 3) return;
-        try {
-          if (c.kind === 'movie') {
-            const found = await moviePoster(c.item);
-            if (found === 'retry') failures++;
-            else if (found) updates.push({ id: c.item.id, patch: { type: 'movie', posterUrl: found } });
-            else missed[c.item.id] = Date.now();
-          } else {
-            const info = await bookInfo(c.item);
-            if (info === 'retry') failures++;
-            else {
-              const hasCover = c.item.coverUrl || c.item.coverImageId;
-              if (!info.cover && !hasCover) missed[c.item.id] = Date.now();
-              updates.push({ id: c.item.id, patch: { type: 'book', genres: info.genres, ...(info.cover && !hasCover ? { coverUrl: info.cover } : {}) } });
+      const next = candidates(rows, missed)
+        .filter((c) => c.kind === kind && !tried.has(c.item.id))
+        .slice(0, atOnce);
+      if (!next.length) break;
+      next.forEach((c) => tried.add(c.item.id));
+      let failed = false;
+      await Promise.all(
+        next.map(async (c) => {
+          try {
+            if (c.kind === 'movie') {
+              const found = await moviePoster(c.item);
+              if (found === 'retry') failed = true;
+              else if (found) pending.push({ id: c.item.id, patch: { type: 'movie', posterUrl: found } });
+              else missed[c.item.id] = Date.now();
+            } else {
+              const info = await bookInfo(c.item);
+              if (info === 'retry') failed = true;
+              else {
+                const hasCover = c.item.coverUrl || c.item.coverImageId;
+                if (!info.cover && !hasCover) missed[c.item.id] = Date.now();
+                pending.push({ id: c.item.id, patch: { type: 'book', genres: info.genres, ...(info.cover && !hasCover ? { coverUrl: info.cover } : {}) } });
+              }
             }
+          } catch {
+            failed = true;
           }
-        } catch {
-          failures++;
-        }
-      };
-      // Films go through the app's own relay (cached), a few at a time; books go to Open Library one by one.
-      await Promise.all([
-        (async () => {
-          for (let i = 0; i < films.length; i += FILMS_AT_ONCE) {
-            await Promise.all(films.slice(i, i + FILMS_AT_ONCE).map(lookUp));
-            await sleep(FILM_GAP_MS);
-          }
-        })(),
-        (async () => {
-          for (const b of books) {
-            await lookUp(b);
-            await sleep(BOOK_GAP_MS);
-          }
-        })(),
-      ]);
+        }),
+      );
       saveMissed(missed);
-            const latest = new Map((getLifeRows() ?? []).map((r) => [r.id, r as unknown as MovieItem | BookItem]));
-      // Never replace a picture you added meanwhile, or genres already there.
-      const still = updates.flatMap((u) => {
-        const r = latest.get(u.id);
-        if (!r) return [];
-        if (r.type === 'movie') return !r.posterUrl && !r.posterImageId ? [u] : [];
-        if (r.type !== 'book' || u.patch.type !== 'book') return [];
-        const patch: LifeItemPatch = { type: 'book' };
-        if (u.patch.coverUrl && !r.coverUrl && !r.coverImageId) patch.coverUrl = u.patch.coverUrl;
-        if (r.genres === undefined) patch.genres = u.patch.genres;
-        return patch.coverUrl || patch.genres ? [{ id: u.id, patch }] : [];
-      });
-      if (still.length) await bulkUpdateLifeItems(still);
-      await sleep(PAUSE_MS);
+      // Save every few finds, so pictures appear as you watch rather than all at the end.
+      if (pending.length >= SAVE_EVERY || Date.now() - lastSave > SAVE_AFTER_MS) {
+        await save(pending);
+        pending = [];
+        lastSave = Date.now();
+      }
+      failsInARow = failed ? failsInARow + 1 : 0;
+      await sleep(failsInARow ? Math.min(BACK_OFF_MS * failsInARow, 5 * 60_000) : gap);
     }
   } finally {
-    running = false;
+    await save(pending).catch(() => undefined);
+    running[kind] = false;
   }
+}
+
+function fillSome() {
+  void lane('movie');
+  void lane('book');
 }
 
 export function startCoverFill(): void {
