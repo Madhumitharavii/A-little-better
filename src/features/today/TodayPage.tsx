@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/db';
 import { breakfastNudge, LOOK_BACK_DAYS, type MealKey, type MealState } from './meals';
 import LetterOpenBanner from '@/features/letters/LetterOpenBanner';
+import { useLetters } from '@/features/letters/useLetters';
+import { unreadOpen } from '@/features/letters/letters';
 import OnThisDayCard from '@/features/memories/OnThisDayCard';
 import YearReviewCard from '@/features/review/YearReviewCard';
 import BadDayView from './BadDayView';
@@ -18,9 +20,7 @@ import { playSoftChime } from '@/shared/utils/sound';
 import type { ToolId } from '@/features/toolbox/types';
 
 import GreetingHeader from './GreetingHeader';
-import TodayFocusBanner from './TodayFocusBanner';
 import ThoughtOfTheDayCard from './ThoughtOfTheDayCard';
-import AdvisorCard from '@/features/advisor/AdvisorCard';
 import CareForMeSection from './CareForMeSection';
 import AroundMeCard from './StatusCards';
 import EveningReflectionCard from './EveningReflectionCard';
@@ -83,6 +83,11 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
   const chime = (type: 'gentle' | 'complete' = 'complete') => playSoftChime(soundEnabled, type);
   const [badDay, setBadDay] = useBadDay(date);
   const [writingLetter, setWritingLetter] = useState(false);
+  // Banners between the top and the cards — only when there's something to say.
+  const letterWaiting = unreadOpen(useLetters(), date).length > 0;
+  const now = new Date();
+  const reviewJustOpened = now.getMonth() === 0 && now.getDate() <= 15;
+  const banners = letterWaiting || reviewJustOpened;
 
   const evening = (
     <EveningReflectionCard
@@ -114,13 +119,11 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
       onEnd={() => setBadDay(false)}
     />
   ) : (
-    // One column on phones; two from tablet width; on a wide window, three columns:
-    //   greeting · this evening
-    //   thought, and any banners
-    //   Care for Me · Care Around Me · Noticed + On this day
-    //   toolbox
-    // (Phones read top to bottom in that same order, so This Evening is near the top.)
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-[auto_auto_auto_1fr_auto] gap-6 sm:gap-8 xl:gap-6 items-start">
+    // Phones read top to bottom: greeting, thought, any banners, Care for Me (meals first),
+    // This Evening, Care Around Me, the reset tools, and On this day last.
+    // On a wide window: greeting + thought | This Evening, then Care for Me | Care Around Me,
+    // then the reset tools, then On this day.
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-6 sm:gap-8 xl:gap-6 items-start">
       {/* Wide screens: the greeting and today's thought stack on the left, level with This Evening on the right. */}
       <div className="md:col-span-2 xl:col-span-8 xl:row-start-1 xl:h-full xl:flex xl:flex-col xl:gap-6">
         <GreetingHeader
@@ -133,21 +136,20 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
         <ThoughtOfTheDayCard className="hidden xl:flex xl:flex-1 xl:flex-col xl:justify-center" />
       </div>
 
-      <div className="md:col-span-2 xl:col-span-4 xl:row-start-1 xl:h-full xl:[&>*]:h-full">{evening}</div>
-
-      <div className="md:col-span-2 xl:col-span-12 xl:row-start-2 space-y-4">
-        {/* On phones and tablets the thought comes after This Evening. */}
-        <ThoughtOfTheDayCard className="xl:hidden" />
-        <LetterOpenBanner />
-        <YearReviewCard justOpened />
-        <TodayFocusBanner
-          myselfDone={findEntry('bathed')?.status === 'done' || findEntry('ateFruit')?.status === 'done'}
-          spaceDone={findEntry('spaceReset')?.status === 'done'}
-          peopleDone={findEntry('messageReset')?.status === 'done' || findEntry('relationshipCheck')?.status === 'done'}
-        />
+      {/* Phones and tablets: the thought right under the greeting. */}
+      <div className="md:col-span-2 xl:hidden">
+        <ThoughtOfTheDayCard />
       </div>
 
-      <div className="xl:col-span-4 xl:col-start-1 xl:row-start-3 xl:row-span-2">
+      {/* Only there when there's something to say (a letter opened, last year's review is ready). */}
+      {banners && (
+        <div className="md:col-span-2 xl:col-span-12 xl:row-start-2 space-y-4">
+          <LetterOpenBanner />
+          <YearReviewCard justOpened />
+        </div>
+      )}
+
+      <div className={`xl:col-span-6 xl:col-start-1 ${banners ? 'xl:row-start-3' : 'xl:row-start-2'}`}>
         <CareForMeSection
           day={onYesterday ? 'yesterday' : 'today'}
           onDayChange={(d) => setCareDate(d === 'yesterday' ? yesterday : null)}
@@ -170,7 +172,9 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
         />
       </div>
 
-      <div className="xl:col-span-4 xl:col-start-5 xl:row-start-3 xl:row-span-2">
+      <div className="xl:col-span-4 xl:col-start-9 xl:row-start-1 xl:h-full xl:[&>*]:h-full">{evening}</div>
+
+      <div className={`md:col-span-2 xl:col-span-6 xl:col-start-7 ${banners ? 'xl:row-start-3' : 'xl:row-start-2'}`}>
         <AroundMeCard
           spaceDone={findEntry('spaceReset')?.status === 'done'}
           messagesDone={findEntry('messageReset')?.status === 'done'}
@@ -181,19 +185,14 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
         />
       </div>
 
-      {/* Gentle advice from what's been logged — worked out on-device. */}
-      <div className="md:col-span-2 xl:col-span-4 xl:col-start-9 xl:row-start-3">
-        <AdvisorCard />
-      </div>
-
-      <div className="md:col-span-2 xl:col-span-4 xl:col-start-9 xl:row-start-4">
-        <OnThisDayCard today={date} />
-      </div>
-
-      {/* Folded by default — see ToolboxGrid. Sits after the daily care
-          so the everyday checklist comes first. */}
-      <div className="md:col-span-2 xl:col-span-12 xl:row-start-5">
+      {/* Folded by default — see ToolboxGrid. */}
+      <div className={`md:col-span-2 xl:col-span-12 ${banners ? 'xl:row-start-4' : 'xl:row-start-3'}`}>
         <ToolboxGrid openTool={openTool} />
+      </div>
+
+      {/* Looking back comes last. */}
+      <div className={`md:col-span-2 xl:col-span-12 ${banners ? 'xl:row-start-5' : 'xl:row-start-4'} empty:hidden`}>
+        <OnThisDayCard today={date} />
       </div>
     </div>
   );

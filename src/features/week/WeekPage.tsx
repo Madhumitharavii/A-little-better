@@ -1,7 +1,6 @@
 import { useToday } from '@/shared/hooks/useToday';
 import { useLifeRows } from '@/db/lifeStore';
 import { useWeekData } from './useWeekData';
-import { deriveLittleThings } from './littleThings';
 import { usePeriodEntries } from '@/features/me/period/usePeriodEntries';
 import { formatDisplayDate } from '@/shared/utils/formatDate';
 import { useState } from 'react';
@@ -11,12 +10,6 @@ import WeekSummaryCard from '@/features/ai/WeekSummaryCard';
 import { useSubjects, useStudySessions, sessionsWithin, totalMinutes, formatMinutes } from '@/features/study/useStudy';
 
 
-const LITTLE_THING_STYLES = [
-  'bg-sage-100 border-sage-300 text-sage-700',
-  'bg-terracotta-100 border-terracotta-400/30 text-terracotta-600',
-  'bg-slate-100 border-slate-500/20 text-slate-800',
-  'bg-amber-50 border-amber-300/50 text-amber-700',
-];
 
 
 /** The first letter of a date's weekday — the strip shows the LAST 7 days, so it doesn't always start on Monday. */
@@ -46,12 +39,10 @@ interface ActivityGroup {
 function WeekActivityCard({ groups }: { groups: ActivityGroup[] }) {
   const filled = groups.filter((g) => g.items.length > 0);
   const empty = groups.filter((g) => g.items.length === 0);
-  // A completely empty week is already said gently by "Little things"
-  // ("A quiet week…") — no need for a second card saying the same.
-  if (filled.length === 0) return null;
   return (
     <section className="bg-sage-100/50 p-5 rounded-3xl border border-sage-300/70 shadow-sm space-y-3">
       <p className="text-xs font-bold uppercase tracking-wider text-sand-800/60">What filled my week</p>
+      {filled.length === 0 && <p className="text-xs text-sand-800/70">🍃 A quiet week — sometimes that’s exactly what’s needed.</p>}
       {filled.length > 0 && (
         <div className="divide-y divide-sand-100">
           {filled.map((group) => (
@@ -71,7 +62,7 @@ function WeekActivityCard({ groups }: { groups: ActivityGroup[] }) {
           ))}
         </div>
       )}
-      {empty.length > 0 && (
+      {filled.length > 0 && empty.length > 0 && (
         <p className="text-xs text-sand-800/50">
           Nothing this week from {empty.map((g) => `${g.icon} ${g.label}`).join(' · ')} — and that's fine.
         </p>
@@ -91,7 +82,6 @@ export default function WeekPage({ showToast }: { showToast: (msg: string) => vo
   const today = useToday();
   const week = useWeekData(today);
   const { stats: cycleStats } = usePeriodEntries();
-  const littleThings = deriveLittleThings(week);
   const lifeLoaded = useLifeRows() !== undefined;
 
   if (openSubjectId) {
@@ -158,24 +148,6 @@ export default function WeekPage({ showToast }: { showToast: (msg: string) => vo
       </div>
 
       <div className="space-y-6 sm:space-y-8 xl:col-span-5 min-w-0">
-
-      {/* Little things from this week — built from actual logged activity */}
-      <section className="bg-terracotta-100/50 p-5 rounded-3xl border border-terracotta-400/20 shadow-sm space-y-3">
-        <p className="text-xs font-bold uppercase tracking-wider text-sand-800/60 flex items-center gap-1.5">
-          <span>🎈</span> Little things from this week
-        </p>
-        <div className="flex flex-col gap-2">
-          {littleThings.map((thing, i) => (
-            <div
-              key={thing.text}
-              className={`px-3.5 py-2.5 rounded-2xl border text-xs font-medium flex items-center gap-2 ${LITTLE_THING_STYLES[i % LITTLE_THING_STYLES.length]}`}
-            >
-              <span className="text-base shrink-0">{thing.icon}</span>
-              <span>{thing.text}</span>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <WeekActivityCard
         groups={[
