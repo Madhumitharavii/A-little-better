@@ -41,5 +41,11 @@
     "workbox-precaching": "7.4.1",
     "workbox-routing": "7.4.1",
     "workbox-strategies": "7.4.1"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "onnxruntime-node@1.19.2": true,
+    "protobufjs@7.6.6": true,
+    "sharp@0.33.5": true
   }
 }
