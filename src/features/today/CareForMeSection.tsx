@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import type { CareEntry } from '@/db/schema';
+import type { CareEntry, CareItemKey } from '@/db/schema';
 import CareItemRow from './CareItemRow';
+import MealsRow from './MealsRow';
+import type { MealKey, MealState } from './meals';
 import ReadingTracker from './ReadingTracker';
 import FocusTimerCard from './FocusTimerCard';
 
@@ -24,7 +26,10 @@ interface CareForMeSectionProps {
   /** Which day the ticks go on — yesterday is there for things done just before midnight. */
   day: 'today' | 'yesterday';
   onDayChange: (day: 'today' | 'yesterday') => void;
-  findEntry: (itemKey: (typeof BASIC_ITEMS)[number]['id'] | 'reading' | 'focus') => CareEntry | undefined;
+  findEntry: (itemKey: CareItemKey) => CareEntry | undefined;
+  onSetMeal: (key: MealKey, state: MealState) => void;
+  /** Shown under the meals when breakfast keeps getting skipped (today only). */
+  breakfastNudge: string | null;
   onToggleDone: (itemKey: string) => void;
   onRequestSkip: (itemKey: string) => void;
   onAddReadingMinutes: (minutes: number) => void;
@@ -41,6 +46,8 @@ export default function CareForMeSection({
   onAddReadingMinutes,
   onOpenFocusTimer,
   showToast,
+  onSetMeal,
+  breakfastNudge,
 }: CareForMeSectionProps) {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const toggle = () => {
@@ -110,6 +117,8 @@ export default function CareForMeSection({
               lateNight && <span className="text-[11px] text-sand-800/60 text-right">Still up? Last night's go on Yesterday.</span>
             )}
           </div>
+
+          <MealsRow findEntry={findEntry} onSet={onSetMeal} nudge={onYesterday ? null : breakfastNudge} />
 
           {BASIC_ITEMS.map((item) => (
             <CareItemRow

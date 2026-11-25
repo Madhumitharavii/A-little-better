@@ -4,6 +4,7 @@ import JournalEntryCard from './JournalEntryCard';
 import JournalEditorModal from './JournalEditorModal';
 import type { JournalEntry } from '@/db/schema';
 import AiJournalTools from '@/features/ai/AiJournalTools';
+import LettersCard from '@/features/letters/LettersCard';
 
 interface JournalPageProps {
   showToast: (msg: string) => void;
@@ -28,6 +29,8 @@ export default function JournalPage({ showToast }: JournalPageProps) {
           + New Entry
         </button>
       </section>
+
+      <LettersCard showToast={showToast} />
 
       <AiJournalTools />
 

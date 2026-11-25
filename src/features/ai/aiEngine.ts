@@ -175,7 +175,7 @@ async function refreshOnce(): Promise<void> {
   docs = collectDocuments({
     journal: journal as JournalEntry[],
     reflections: reflections as DailyReflection[],
-    life: rows.filter((r) => r.type !== 'subject' && r.type !== 'studySession') as unknown as LifeItem[],
+    life: rows.filter((r) => r.type !== 'subject' && r.type !== 'studySession' && r.type !== 'letter') as unknown as LifeItem[],
     studySessions: rows.filter((r) => r.type === 'studySession') as unknown as StudySessionItem[],
   });
 
@@ -342,7 +342,7 @@ export function useAiBackground(): void {
   const lifeRows = useLifeRows();
   const lifeStamp = useMemo(() => {
     if (!enabled || !lifeRows) return '';
-    const relevant = lifeRows.filter((x) => x.type !== 'toolEvent' && x.type !== 'pref');
+    const relevant = lifeRows.filter((x) => x.type !== 'toolEvent' && x.type !== 'pref' && x.type !== 'letter');
     return `${relevant.length}:${stamp(relevant)}`;
   }, [enabled, lifeRows]);
   const signature = writing === undefined || lifeRows === undefined ? undefined : `${writing}|${lifeStamp}`;

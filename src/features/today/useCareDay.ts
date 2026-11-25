@@ -32,5 +32,7 @@ export function useCareDay(date: string) {
   const addMinutes = (itemKey: Extract<CareItemKey, 'reading' | 'focus'>, minutes: number) =>
     addMinutesToCareEntry(date, itemKey, minutes);
 
-  return { date, careEntries, findEntry, markDone, markSkipped, toggleDone, addMinutes };
+  const clear = (itemKey: CareItemKey) => clearCareEntry(date, itemKey);
+
+  return { date, careEntries, findEntry, markDone, markSkipped, toggleDone, addMinutes, clear };
 }

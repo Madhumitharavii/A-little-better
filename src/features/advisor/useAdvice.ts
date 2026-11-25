@@ -32,7 +32,7 @@ function useAdvisorData(): AdvisorData | undefined {
       care,
       journal: journal.filter((j) => !j.deletedAt),
       reflections,
-      life: rows.filter((i) => i.type !== 'subject' && i.type !== 'studySession' && i.type !== 'toolEvent' && i.type !== 'pref') as unknown as AdvisorData['life'],
+      life: rows.filter((i) => i.type !== 'subject' && i.type !== 'studySession' && i.type !== 'toolEvent' && i.type !== 'pref' && i.type !== 'letter') as unknown as AdvisorData['life'],
       people: people.filter((p) => !p.deletedAt),
       toolEvents: rows.filter((i) => i.type === 'toolEvent') as unknown as AdvisorData['toolEvents'],
       subjects: rows.filter((i) => i.type === 'subject') as unknown as AdvisorData['subjects'],

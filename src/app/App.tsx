@@ -15,6 +15,8 @@ import LifePage from '@/features/life/LifePage';
 import WeekPage from '@/features/week/WeekPage';
 import { checkReminders } from '@/shared/utils/reminders';
 import { startWaterReminders } from '@/lib/water';
+import { startMealReminders } from '@/lib/mealReminders';
+import { startLetterWatch } from '@/lib/letterWatch';
 import { playSoftChime } from '@/shared/utils/sound';
 import { getLocalDateKey } from '@/db/dateUtils';
 import { runSync } from '@/lib/sync/syncEngine';
@@ -82,10 +84,20 @@ export default function App() {
 
   // Drink-water nudges: on opening the app, then every so often while it's open (lib/water.ts).
   useEffect(() => {
-    startWaterReminders((message) => {
-      showToast(message, 9000);
-      void getSettings().then((s) => playSoftChime(s.soundEnabled));
-    });
+    // These can come at the same moment (e.g. on opening the app), so they take turns instead of replacing each other.
+    let freeAt = 0;
+    const queued = (ms: number, chime: 'gentle' | 'complete') => (message: string) => {
+      const wait = Math.max(0, freeAt - Date.now());
+      freeAt = Date.now() + wait + ms + 400;
+      window.setTimeout(() => {
+        showToast(message, ms);
+        void getSettings().then((s) => playSoftChime(s.soundEnabled, chime));
+      }, wait);
+    };
+    startWaterReminders(queued(9000, 'gentle'));
+    // Meal nudges (lib/mealReminders.ts) and letters from your past self opening (lib/letterWatch.ts).
+    startMealReminders(queued(9000, 'gentle'));
+    startLetterWatch(queued(12000, 'complete'));
   }, [showToast]);
 
   // Best-effort reminders: checked whenever the app is opened or

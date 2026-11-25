@@ -18,7 +18,11 @@ export type CareItemKey =
   | 'focus'
   | 'spaceReset'
   | 'messageReset'
-  | 'relationshipCheck';
+  | 'relationshipCheck'
+  // Meals — ticked as eaten, or marked skipped (see features/today/meals.ts).
+  | 'breakfast'
+  | 'lunch'
+  | 'dinner';
 
 export type CareStatus = 'done' | 'skipped';
 
@@ -399,6 +403,30 @@ export interface SyncedPrefItem {
   title: string;
   key: string;
   value: unknown;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+/**
+ * A letter to your future self: written now, sealed until `openOn`.
+ * Stored as a row of the synced lifeItems table (like study rows), kept
+ * out of every Life view, the advisor and the on-device AI. Sealed means
+ * the app won't show the words before that date — it isn't encryption.
+ */
+export interface LetterItem {
+  id: string;
+  type: 'letter';
+  title: string;
+  body: string;
+  /** Local date key it was written on. */
+  writtenOn: string;
+  /** Local date key it opens on. */
+  openOn: string;
+  /** When the "it's open" message was shown (so it's only announced once). */
+  announcedAt?: string;
+  /** When it was first read. */
+  readAt?: string;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;

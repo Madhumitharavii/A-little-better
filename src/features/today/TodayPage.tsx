@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db/db';
+import { breakfastNudge, LOOK_BACK_DAYS, type MealKey, type MealState } from './meals';
+import LetterOpenBanner from '@/features/letters/LetterOpenBanner';
 import { useTodayCare } from './useTodayCare';
 import { useCareDay } from './useCareDay';
 import { addDays } from '@/db/dateUtils';
@@ -47,6 +51,7 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
     markSkipped,
     toggleDone,
     addMinutes,
+    clear,
     saveReflectionField,
     saveEveningNotes,
   } = useTodayCare();
@@ -56,7 +61,18 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
   const [careDate, setCareDate] = useState<string | null>(null);
   const onYesterday = careDate === yesterday;
   const yesterdayCare = useCareDay(yesterday);
-  const care = onYesterday ? yesterdayCare : { findEntry, toggleDone, addMinutes, markSkipped };
+  const care = onYesterday ? yesterdayCare : { findEntry, toggleDone, addMinutes, markSkipped, markDone, clear };
+
+  // The past week's meals, for the "health before everything" breakfast nudge.
+  const recentCare = useLiveQuery(() => db.careEntries.where('date').between(addDays(date, -LOOK_BACK_DAYS), date).toArray(), [date]);
+  const nudge = recentCare ? breakfastNudge(recentCare, date) : null;
+  const setMeal = (key: MealKey, state: MealState) => {
+    if (state === 'ate') {
+      void care.markDone(key);
+      chime();
+    } else if (state === 'skipped') void care.markSkipped(key, 'skipped');
+    else void care.clear(key);
+  };
 
   const [activeTool, setActiveTool] = useState<ToolId | null>(null);
   const [skipTarget, setSkipTarget] = useState<CareItemKey | null>(null);
@@ -91,7 +107,8 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
         <ThoughtOfTheDayCard />
       </div>
 
-      <div className="md:col-span-2 xl:col-span-12 xl:row-start-2">
+      <div className="md:col-span-2 xl:col-span-12 xl:row-start-2 space-y-4">
+        <LetterOpenBanner />
         <TodayFocusBanner
           myselfDone={findEntry('bathed')?.status === 'done' || findEntry('ateFruit')?.status === 'done'}
           spaceDone={findEntry('spaceReset')?.status === 'done'}
@@ -118,6 +135,8 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
           }}
           onOpenFocusTimer={() => openTool('focusTimer')}
           showToast={showToast}
+          onSetMeal={setMeal}
+          breakfastNudge={nudge}
         />
       </div>
 

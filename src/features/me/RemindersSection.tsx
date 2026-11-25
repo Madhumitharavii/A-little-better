@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { getSettings, saveSettings } from '@/db/repositories/settingsRepository';
 import { getNotificationPermission, requestNotificationPermission } from '@/shared/utils/reminders';
 import { readWaterPrefs, saveWaterPrefs, WATER_DEFAULTS, type WaterPrefs } from '@/lib/water';
+import { MEAL_DEFAULTS, readMealPrefs, saveMealPrefs, type MealPrefs } from '@/lib/mealReminders';
 
 const WATER_EVERY = [30, 45, 60, 90, 120];
 
@@ -10,9 +11,16 @@ export default function RemindersSection() {
   const settings = useLiveQuery(() => getSettings(), []);
   const [permission, setPermission] = useState(getNotificationPermission());
   const [water, setWater] = useState<WaterPrefs>(WATER_DEFAULTS);
+  const [meals, setMeals] = useState<MealPrefs>(MEAL_DEFAULTS);
   useEffect(() => {
     void readWaterPrefs().then(setWater);
+    void readMealPrefs().then(setMeals);
   }, []);
+  const toggleMeals = () => {
+    const next = { ...meals, enabled: !meals.enabled };
+    setMeals(next);
+    void saveMealPrefs(next);
+  };
   const changeWater = (patch: Partial<WaterPrefs>) => {
     const next = { ...water, ...patch };
     setWater(next);
@@ -147,6 +155,20 @@ export default function RemindersSection() {
             />
           </div>
         )}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-sand-900">🍳 Meals</p>
+          <p className="text-[10px] text-sand-800/60">
+            If breakfast isn’t marked by 9:30, lunch by 2, dinner by 8:30 — and an evening nudge when breakfast keeps getting skipped.
+          </p>
+        </div>
+        <button
+          onClick={toggleMeals}
+          className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold ${meals.enabled ? 'bg-sage-500 text-white' : 'bg-sand-200 text-sand-800'}`}
+        >
+          {meals.enabled ? 'On' : 'Off'}
+        </button>
       </div>
     </div>
   );
