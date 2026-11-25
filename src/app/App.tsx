@@ -198,7 +198,7 @@ export default function App() {
       {/* Wider windows (Mac, tablets): navigation in a sidebar on the left. */}
       <aside className="hidden md:flex flex-col w-52 lg:w-60 shrink-0 h-screen sticky top-0 overflow-y-auto border-r border-sand-200 px-4 lg:px-5 py-7 gap-7">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 shrink-0 rounded-2xl bg-terracotta-400/10 flex items-center justify-center text-xl">🍃</div>
+          <img src="/icons/icon.svg" alt="" className="w-10 h-10 shrink-0 rounded-2xl" />
           <div className="min-w-0">
             <p className="font-serif text-lg font-semibold text-sand-900 tracking-tight leading-tight">A Little Better</p>
             <p className="text-[10px] text-sand-800/70 italic font-serif leading-snug">Don't optimize your life. Take care of it.</p>
@@ -255,9 +255,7 @@ export default function App() {
       <header className="pb-6 border-b border-sand-200 md:hidden">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-terracotta-400/10 flex items-center justify-center text-terracotta-600 text-xl font-bold">
-              🍃
-            </div>
+            <img src="/icons/icon.svg" alt="" className="w-10 h-10 shrink-0 rounded-2xl" />
             <div>
               <h1 className="font-serif text-xl font-semibold text-sand-900 tracking-tight">
                 A Little Better
