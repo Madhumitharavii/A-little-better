@@ -6,6 +6,8 @@ import LetterOpenBanner from '@/features/letters/LetterOpenBanner';
 import OnThisDayCard from '@/features/memories/OnThisDayCard';
 import YearReviewCard from '@/features/review/YearReviewCard';
 import BadDayView from './BadDayView';
+import WriteLetterModal from '@/features/letters/WriteLetterModal';
+import { longDate } from '@/features/letters/letters';
 import MealsRow from './MealsRow';
 import { useBadDay } from './badDay';
 import { useTodayCare } from './useTodayCare';
@@ -80,6 +82,7 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
 
   const chime = (type: 'gentle' | 'complete' = 'complete') => playSoftChime(soundEnabled, type);
   const [badDay, setBadDay] = useBadDay(date);
+  const [writingLetter, setWritingLetter] = useState(false);
 
   const evening = (
     <EveningReflectionCard
@@ -88,6 +91,7 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
       onChange={(field, value) => saveReflectionField(field, value)}
       eveningDone={!!reflection?.eveningDone}
       onOpenEvening={() => openTool('evening')}
+      onWriteLetter={() => setWritingLetter(true)}
     />
   );
 
@@ -117,7 +121,8 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
     //   toolbox
     // (Phones read top to bottom in that same order, so This Evening is near the top.)
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-[auto_auto_auto_1fr_auto] gap-6 sm:gap-8 xl:gap-6 items-start">
-      <div className="md:col-span-2 xl:col-span-8 xl:row-start-1 xl:h-full xl:[&>*]:h-full">
+      {/* Wide screens: the greeting and today's thought stack on the left, level with This Evening on the right. */}
+      <div className="md:col-span-2 xl:col-span-8 xl:row-start-1 xl:h-full xl:flex xl:flex-col xl:gap-6">
         <GreetingHeader
           date={date}
           streaks={streaks}
@@ -125,12 +130,14 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
           onOpenScrolling={() => openTool('scrolling')}
           onBadDay={() => setBadDay(true)}
         />
+        <ThoughtOfTheDayCard className="hidden xl:flex xl:flex-1 xl:flex-col xl:justify-center" />
       </div>
 
       <div className="md:col-span-2 xl:col-span-4 xl:row-start-1 xl:h-full xl:[&>*]:h-full">{evening}</div>
 
       <div className="md:col-span-2 xl:col-span-12 xl:row-start-2 space-y-4">
-        <ThoughtOfTheDayCard />
+        {/* On phones and tablets the thought comes after This Evening. */}
+        <ThoughtOfTheDayCard className="xl:hidden" />
         <LetterOpenBanner />
         <YearReviewCard seasonal />
         <TodayFocusBanner
@@ -194,6 +201,16 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
   return (
     <>
       {page}
+
+      {writingLetter && (
+        <WriteLetterModal
+          onClose={() => setWritingLetter(false)}
+          onSealed={(openOn) => {
+            setWritingLetter(false);
+            showToast(`Sealed 🔒 It opens ${longDate(openOn)}. You'll find it in Journal.`);
+          }}
+        />
+      )}
 
       {/* Skip reason */}
       {skipTarget && (
