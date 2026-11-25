@@ -83,11 +83,12 @@ export function collectDocuments(input: {
         text = join(item.notes);
         break;
     }
-    if (text) push('life', item.id, date, item.title, join(item.title, text));
+    // The title is shown separately — left out of the text so it doesn't sway what the note is "about".
+    if (text) push('life', item.id, date, item.title, text);
   }
   for (const s of input.studySessions) {
     if (s.deletedAt || !s.notes) continue;
-    push('study', s.id, s.date, s.title, join(s.title, s.notes));
+    push('study', s.id, s.date, s.title, s.notes);
   }
   return docs;
 }

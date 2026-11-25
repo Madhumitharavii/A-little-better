@@ -2,7 +2,42 @@ import { useState } from 'react';
 import { formatDisplayDate } from '@/shared/utils/formatDate';
 import { searchByMeaning, useAiState } from './aiEngine';
 import type { AiDocument } from './documents';
-import type { Scored } from './ml';
+import type { Emotion } from './ml';
+import type { SearchHit } from './searchRank';
+
+const FEELING_WORD: Record<Emotion, string> = {
+  sadness: 'sad',
+  anxiety: 'anxious or stressed',
+  anger: 'angry or frustrated',
+  loneliness: 'lonely',
+  tiredness: 'tired',
+  joy: 'happy',
+  calm: 'calm',
+  gratitude: 'grateful',
+};
+
+const STRENGTH: Record<SearchHit<AiDocument>['strength'], { label: string; className: string }> = {
+  strong: { label: 'Strong match', className: 'bg-sage-100 text-sage-700' },
+  good: { label: 'Good match', className: 'bg-sand-100 text-sand-800' },
+  related: { label: 'Related', className: 'bg-sand-50 text-sand-800/60' },
+};
+
+/** The matching sentence inside the entry's text, highlighted. */
+function Snippet({ text, sentence }: { text: string; sentence?: string }) {
+  const at = sentence ? text.indexOf(sentence) : -1;
+  if (!sentence || at < 0) return <p className="text-[11px] text-sand-800/80 line-clamp-2">{text}</p>;
+  const before = text.slice(Math.max(0, at - 80), at);
+  const after = text.slice(at + sentence.length, at + sentence.length + 80);
+  return (
+    <p className="text-[11px] text-sand-800/80 leading-relaxed">
+      {at > 80 && '…'}
+      {before}
+      <mark className="bg-terracotta-100 text-sand-900 rounded px-0.5">{sentence}</mark>
+      {after}
+      {at + sentence.length + 80 < text.length && '…'}
+    </p>
+  );
+}
 
 const SOURCE_LABEL: Record<AiDocument['source'], string> = {
   journal: '📝 Journal',
@@ -15,14 +50,17 @@ const SOURCE_LABEL: Record<AiDocument['source'], string> = {
 export default function MeaningSearch() {
   const ai = useAiState();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Scored<AiDocument>[] | null>(null);
+  const [results, setResults] = useState<SearchHit<AiDocument>[] | null>(null);
+  const [feeling, setFeeling] = useState<Emotion | null>(null);
   const [busy, setBusy] = useState(false);
 
   const run = async () => {
     if (!query.trim()) return;
     setBusy(true);
     try {
-      setResults(await searchByMeaning(query));
+      const found = await searchByMeaning(query);
+      setResults(found.hits);
+      setFeeling(found.feeling);
     } finally {
       setBusy(false);
     }
@@ -64,16 +102,17 @@ export default function MeaningSearch() {
           <p className="text-[11px] text-sand-800/60">Nothing close in meaning yet.</p>
         ) : (
           <ul className="space-y-2">
-            {results.map(({ item, score }) => (
+            {feeling && <li className="text-[11px] text-sand-800/60">Showing writing that sounds {FEELING_WORD[feeling]} — the closest first.</li>}
+            {results.map(({ item, sentence, strength }) => (
               <li key={item.key} className="p-3 bg-white border border-sand-200 rounded-2xl space-y-1">
                 <div className="flex items-center justify-between gap-2 text-[10px] text-sand-800/60">
                   <span>
                     {SOURCE_LABEL[item.source]} · {formatDisplayDate(item.date)}
                   </span>
-                  <span title="How close in meaning">{Math.round(score * 100)}% match</span>
+                  <span className={`px-2 py-0.5 rounded-full font-medium ${STRENGTH[strength].className}`}>{STRENGTH[strength].label}</span>
                 </div>
                 <p className="text-xs font-semibold text-sand-900">{item.title}</p>
-                <p className="text-[11px] text-sand-800/80 line-clamp-2">{item.text}</p>
+                <Snippet text={item.text} sentence={sentence} />
               </li>
             ))}
           </ul>

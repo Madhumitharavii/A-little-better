@@ -448,7 +448,7 @@ export interface ToolEventItem extends ToolEvent {
 export interface EmbeddingRecord {
   /** `${source}:${sourceId}` */
   id: string;
-  source: 'journal' | 'reflection' | 'life' | 'study' | 'anchor' | 'sentence';
+  source: 'journal' | 'reflection' | 'life' | 'study' | 'anchor' | 'sentence' | 'passage';
   sourceId: string;
   hash: string;
   vector: number[];

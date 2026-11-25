@@ -8,7 +8,8 @@ import type { Theme } from '@/features/advisor/lexicon';
 import { embed, shutDownModel, subscribeModelStatus, warmUpModel, type ModelStatus } from './embedder';
 import { collectDocuments, textHash, type AiDocument } from './documents';
 import { computeThemes, emotionThemeCounts, emotionsByDoc, emotionTrend, weekSentences, type EmotionWeek, type JournalTheme, type WeekSentence } from './analysis';
-import { classifyEmotionWithHead, dot, mean, normalize, scoreTags, STARTER_TAGS, summarise, THEME_NAMES, topK, type Emotion, type Scored, type SoftmaxModel, type Vector } from './ml';
+import { classifyEmotionWithHead, dot, mean, normalize, scoreTags, splitSentences, STARTER_TAGS, summarise, THEME_NAMES, type Emotion, type SoftmaxModel, type Vector } from './ml';
+import { queryEmotion, rankByMeaning, type SearchHit, type SearchUnit } from './searchRank';
 import emotionHeadJson from './emotionHead.json';
 import { writePref } from '@/db/repositories/syncedPrefs';
 
@@ -114,6 +115,35 @@ export function useModelStatus(): ModelStatus {
 
 let docs: AiDocument[] = [];
 let docVectors: Vector[] = [];
+/** Each document's sentences with their vectors (only for entries with more than one sentence) — for search. */
+let docPassages: SearchUnit[][] = [];
+
+/** Most sentences per entry that search looks at one by one. */
+const MAX_PASSAGES = 40;
+const passagesOf = (text: string) => {
+  const s = splitSentences(text);
+  return s.length > 1 ? s.slice(0, MAX_PASSAGES) : [];
+};
+
+/** Embeddings for every sentence of every entry, cached by text (stale ones pruned). */
+async function passageVectors(texts: string[]): Promise<Map<string, Vector>> {
+  const unique = [...new Set(texts)];
+  const ids = unique.map((t) => `passage:${textHash(t)}`);
+  const cached = await db.embeddings.bulkGet(ids);
+  const missing = unique.filter((_, i) => !cached[i]);
+  for (let i = 0; i < missing.length; i += BATCH) {
+    setState({ indexing: { done: i, total: missing.length } });
+    const batch = missing.slice(i, i + BATCH);
+    const vectors = await embed(batch);
+    const now = new Date().toISOString();
+    await db.embeddings.bulkPut(batch.map((t, j) => ({ id: `passage:${textHash(t)}`, source: 'passage' as const, sourceId: textHash(t), hash: textHash(t), vector: vectors[j], updatedAt: now })));
+  }
+  const keep = new Set(ids);
+  const old = (await db.embeddings.where('source').equals('passage').primaryKeys()).filter((id) => !keep.has(id as string));
+  if (old.length) await db.embeddings.bulkDelete(old as string[]);
+  const all = await db.embeddings.bulkGet(ids);
+  return new Map(unique.map((t, i) => [t, all[i]!.vector]));
+}
 /** Starter-tag description embeddings (for tag suggestions). */
 let starterTagVectors: { tag: string; vector: Vector }[] = [];
 const MIN_SENTENCES_FOR_SUMMARY = 4;
@@ -180,7 +210,7 @@ async function refreshOnce(): Promise<void> {
   });
 
   // Embed only what's new or changed.
-  const existing = new Map((await db.embeddings.where('source').noneOf(['anchor', 'sentence']).toArray()).map((e) => [e.id, e]));
+  const existing = new Map((await db.embeddings.where('source').noneOf(['anchor', 'sentence', 'passage']).toArray()).map((e) => [e.id, e]));
   const todo = docs.filter((d) => existing.get(d.key)?.hash !== textHash(d.text));
   for (let i = 0; i < todo.length; i += BATCH) {
     setState({ indexing: { done: i, total: todo.length } });
@@ -197,6 +227,11 @@ async function refreshOnce(): Promise<void> {
   const stored = new Map((await db.embeddings.bulkGet(docs.map((d) => d.key))).map((e, i) => [docs[i].key, e?.vector]));
   docs = docs.filter((d) => stored.get(d.key));
   docVectors = docs.map((d) => stored.get(d.key)!);
+
+  // Sentence by sentence, so one line in a long entry can still be found.
+  const sentencesByDoc = docs.map((d) => passagesOf(d.text));
+  const passageMap = await passageVectors(sentencesByDoc.flat());
+  docPassages = sentencesByDoc.map((list) => list.map((text) => ({ text, vector: passageMap.get(text)! })));
 
   // Emotions: the trained classifier head (scripts/emotion/train.ts).
   const classify = (v: Vector) => classifyEmotionWithHead(v, emotionHead, emotionHead.minConfidence).emotion;
@@ -257,12 +292,14 @@ export async function refreshAi(): Promise<void> {
   return running;
 }
 
-/** Search everything written in the app by meaning. */
-export async function searchByMeaning(query: string, k = 12): Promise<Scored<AiDocument>[]> {
+/** Search everything written in the app by meaning (see searchRank.ts for how it's ranked). */
+export async function searchByMeaning(query: string, k = 12): Promise<{ hits: SearchHit<AiDocument>[]; feeling: Emotion | null }> {
   const q = query.trim();
-  if (!q || docs.length === 0) return [];
+  if (!q || docs.length === 0) return { hits: [], feeling: null };
   const [vector] = await embed([q]);
-  return topK(vector, docs.map((d, i) => ({ item: d, vector: docVectors[i] })), k, 0.28);
+  const feeling = queryEmotion(q);
+  const entries = docs.map((d, i) => ({ item: d, units: [{ text: d.text, vector: docVectors[i] }, ...(docPassages[i] ?? [])] }));
+  return { hits: rankByMeaning(vector, entries, emotionHead, feeling, k), feeling };
 }
 
 // ── "could I start this today?" (for the I'm-bored ideas) ──
