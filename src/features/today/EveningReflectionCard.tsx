@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface EveningReflectionCardProps {
   gratitude: string;
@@ -30,6 +30,16 @@ export default function EveningReflectionCard({
 }: EveningReflectionCardProps) {
   const startsOpen = new Date().getHours() >= EVENING_HOUR || !!gratitude || !!smallWin;
   const [open, setOpen] = useState(startsOpen);
+  // There's no save button — every keystroke is saved. Say so, so it doesn't feel like it went nowhere.
+  const [status, setStatus] = useState<'idle' | 'typing' | 'saved'>('idle');
+  const timer = useRef<number>();
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const write = (field: 'gratitude' | 'smallWin', value: string) => {
+    onChange(field, value);
+    setStatus('typing');
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setStatus('saved'), 700);
+  };
 
   return (
     <section className="bg-gradient-to-br from-slate-100 to-terracotta-100/60 p-5 sm:p-8 rounded-3xl border border-slate-500/20 shadow-sm space-y-4">
@@ -72,7 +82,12 @@ export default function EveningReflectionCard({
         </button>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-sand-900">Today's Reflection</p>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-sm font-semibold text-sand-900">Today's Reflection</p>
+            <p aria-live="polite" className="text-[11px] text-sage-700 font-semibold">
+              {status === 'saved' ? '✓ Saved' : ''}
+            </p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
             <div>
               <label className="block text-xs font-medium text-sand-800 mb-1.5">Something I am grateful for today</label>
@@ -80,7 +95,7 @@ export default function EveningReflectionCard({
                 aria-label="Something I am grateful for today"
                 rows={2}
                 value={gratitude}
-                onChange={(e) => onChange('gratitude', e.target.value)}
+                onChange={(e) => write('gratitude', e.target.value)}
                 placeholder="A warm coffee, soft sunlight, a quiet moment..."
                 className="w-full p-3 bg-sand-50/50 border border-sand-200 rounded-2xl text-xs text-sand-900 focus:outline-none focus:border-sand-300 resize-none"
               />
@@ -92,7 +107,7 @@ export default function EveningReflectionCard({
                 aria-label="A small win or quiet progress"
                 rows={2}
                 value={smallWin}
-                onChange={(e) => onChange('smallWin', e.target.value)}
+                onChange={(e) => write('smallWin', e.target.value)}
                 placeholder="I started a tough task, drank fresh water, rested well..."
                 className="w-full p-3 bg-sand-50/50 border border-sand-200 rounded-2xl text-xs text-sand-900 focus:outline-none focus:border-sand-300 resize-none"
               />
