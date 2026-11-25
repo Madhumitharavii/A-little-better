@@ -8,7 +8,7 @@ import WriteLetterModal from './WriteLetterModal';
 import ReadLetterModal from './ReadLetterModal';
 
 /** Letters to your future self — sealed until the day you pick. */
-export default function LettersCard({ showToast }: { showToast: (msg: string) => void }) {
+export default function LettersCard({ showToast, className = '' }: { showToast: (msg: string) => void; className?: string }) {
   const today = useToday();
   const letters = useLetters();
   const [writing, setWriting] = useState(false);
@@ -19,7 +19,7 @@ export default function LettersCard({ showToast }: { showToast: (msg: string) =>
   const opened = letters.filter((l) => isOpen(l, today)).reverse();
 
   return (
-    <section className="bg-white p-4 sm:p-5 rounded-3xl border border-sand-200 shadow-sm space-y-3">
+    <section className={`bg-white p-4 sm:p-5 rounded-3xl border border-sand-200 shadow-sm flex flex-col gap-3 ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h3 className="serif text-base font-semibold text-sand-900">💌 Letters to future me</h3>
@@ -32,6 +32,17 @@ export default function LettersCard({ showToast }: { showToast: (msg: string) =>
           ✉️ Write
         </button>
       </div>
+
+      {letters.length === 0 && (
+        <div className="flex-1 flex items-center gap-3 p-3 rounded-2xl border border-dashed border-sand-300 bg-sand-50/40">
+          <span className="text-2xl" aria-hidden="true">
+            🕊️
+          </span>
+          <p className="text-[11px] text-sand-800/70 leading-relaxed">
+            Nothing sealed yet. Maybe one for your birthday, New Year, or the end of a hard week.
+          </p>
+        </div>
+      )}
 
       {letters.length > 0 && (
         <ul className="space-y-2 max-h-72 overflow-y-auto">

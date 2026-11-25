@@ -8,8 +8,6 @@ import { unreadOpen } from '@/features/letters/letters';
 import OnThisDayCard from '@/features/memories/OnThisDayCard';
 import YearReviewCard from '@/features/review/YearReviewCard';
 import BadDayView from './BadDayView';
-import WriteLetterModal from '@/features/letters/WriteLetterModal';
-import { longDate } from '@/features/letters/letters';
 import MealsRow from './MealsRow';
 import { useBadDay } from './badDay';
 import { useTodayCare } from './useTodayCare';
@@ -82,7 +80,6 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
 
   const chime = (type: 'gentle' | 'complete' = 'complete') => playSoftChime(soundEnabled, type);
   const [badDay, setBadDay] = useBadDay(date);
-  const [writingLetter, setWritingLetter] = useState(false);
   // Banners between the top and the cards — only when there's something to say.
   const letterWaiting = unreadOpen(useLetters(), date).length > 0;
   const now = new Date();
@@ -96,7 +93,6 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
       onChange={(field, value) => saveReflectionField(field, value)}
       eveningDone={!!reflection?.eveningDone}
       onOpenEvening={() => openTool('evening')}
-      onWriteLetter={() => setWritingLetter(true)}
     />
   );
 
@@ -200,16 +196,6 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
   return (
     <>
       {page}
-
-      {writingLetter && (
-        <WriteLetterModal
-          onClose={() => setWritingLetter(false)}
-          onSealed={(openOn) => {
-            setWritingLetter(false);
-            showToast(`Sealed 🔒 It opens ${longDate(openOn)}. You'll find it in Journal.`);
-          }}
-        />
-      )}
 
       {/* Skip reason */}
       {skipTarget && (

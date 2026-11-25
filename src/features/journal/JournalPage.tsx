@@ -33,13 +33,8 @@ export default function JournalPage({ showToast }: JournalPageProps) {
         </button>
       </section>
 
-      {/* Search (and themes) on the left; letters to future me — used now and then — small on the right. */}
-      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-4 lg:items-start">
-        <div className="lg:col-span-2">
-          <AiJournalTools />
-        </div>
-        <LettersCard showToast={showToast} />
-      </div>
+      {/* Search with letters to future me beside it (same height), then themes across the full width. */}
+      <AiJournalTools beside={<LettersCard showToast={showToast} className="h-full" />} />
 
       {entries.length === 0 ? (
         <div className="bg-white p-8 rounded-3xl border border-sand-200 text-center space-y-2">

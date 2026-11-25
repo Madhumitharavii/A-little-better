@@ -7,8 +7,6 @@ interface EveningReflectionCardProps {
   /** Whether "Before I call it a day" (the evening wind-down) is done today. */
   eveningDone: boolean;
   onOpenEvening: () => void;
-  /** Opens "A letter to future me". */
-  onWriteLetter?: () => void;
 }
 
 /** From this hour on, the reflection opens by itself — it's an end-of-day thing. */
@@ -26,7 +24,6 @@ export default function EveningReflectionCard({
   onChange,
   eveningDone,
   onOpenEvening,
-  onWriteLetter,
 }: EveningReflectionCardProps) {
   const startsOpen = new Date().getHours() >= EVENING_HOUR || !!gratitude || !!smallWin;
   const [open, setOpen] = useState(startsOpen);
@@ -58,15 +55,6 @@ export default function EveningReflectionCard({
       >
         <span>🌙</span> {eveningDone ? 'Evening Done ✓' : 'Before I call it a day'}
       </button>
-
-      {onWriteLetter && (
-        <button
-          onClick={onWriteLetter}
-          className="w-full px-4 py-2.5 rounded-2xl text-xs font-semibold bg-terracotta-100/60 hover:bg-terracotta-100 text-sand-900 transition-all flex items-center justify-center gap-2"
-        >
-          <span>💌</span> Write a letter to future me
-        </button>
-      )}
 
       {!open ? (
         <button
