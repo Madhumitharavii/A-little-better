@@ -7,6 +7,8 @@ import { useLifeImageUrl } from '@/shared/hooks/useLifeImageUrl';
 import { bookInfo } from '@/lib/coverFill';
 import { pickFrom } from '../movies/moviePick';
 import { bookPool, genreOptions, inGenre, todaysBookPick } from './bookPick';
+import { promiseRows } from '../promises';
+import PromiseTracker from '../PromiseTracker';
 
 interface Props {
   books: BookItem[];
@@ -20,7 +22,9 @@ function Cover({ book, big }: { book: BookItem; big?: boolean }) {
   const own = useLifeImageUrl(book.coverImageId);
   const src = own ?? book.coverUrl;
   return (
-    <div className={`${big ? 'w-40 h-60' : 'w-28 h-[168px]'} mx-auto rounded-2xl overflow-hidden bg-sand-100 flex items-center justify-center shadow-md`}>
+    <div
+      className={`${big ? 'w-40 h-60' : 'w-28 h-[168px]'} mx-auto rounded-2xl overflow-hidden bg-sand-100 flex items-center justify-center shadow-md`}
+    >
       {src ? <img src={src} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <span className="text-4xl">📖</span>}
     </div>
   );
@@ -28,18 +32,21 @@ function Cover({ book, big }: { book: BookItem; big?: boolean }) {
 
 /**
  * "Pick for me" for books: a random book from want-to-read — any book, or
- * from a genre you choose. The moment you spin, it's marked as reading
- * (started today). One pick a day, no re-rolls.
+ * from a genre you choose. Nothing is logged: "I'll read this" makes it a
+ * promise (it stays on want-to-read until you start it), and the promise
+ * tracker shows which ones you kept. Spin again as often as you like.
  */
 export default function BookPickModal({ books, onClose, onOpenBook }: Props) {
   const today = getLocalDateKey();
   const pool = useMemo(() => bookPool(books), [books]);
   const options = useMemo(() => genreOptions(pool), [pool]);
   const unsorted = useMemo(() => pool.filter((b) => b.genres === undefined).length, [pool]);
-  const already = useMemo(() => todaysBookPick(books, today), [books, today]);
+  const promised = useMemo(() => todaysBookPick(books, today), [books, today]);
+  const promises = useMemo(() => promiseRows([], books), [books]);
+  const [showPromised, setShowPromised] = useState(true);
   const [mode, setMode] = useState<'any' | 'genre'>('any');
   const [genre, setGenre] = useState<string | null>(null);
-  const [chosen, setChosen] = useState<BookItem | null>(null);
+  const [landed, setLanded] = useState<BookItem | null>(null);
   const [flash, setFlash] = useState<BookItem | null>(null);
   const [spinning, setSpinning] = useState(false);
   const timers = useRef<number[]>([]);
@@ -47,18 +54,28 @@ export default function BookPickModal({ books, onClose, onOpenBook }: Props) {
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
 
   const from = mode === 'genre' ? inGenre(pool, genre) : pool;
-  const result = chosen ?? (spinning ? null : already ?? null);
-  const live = result ? books.find((b) => b.id === result.id) ?? result : null;
+  const result = spinning ? null : (landed ?? (showPromised ? (promised ?? null) : null));
+  const live = result ? (books.find((b) => b.id === result.id) ?? result) : null;
+  const isPromise = !!live && live.pickedOn === today;
 
-  async function spin() {
+  function spin() {
     const book = pickFrom(from);
     if (!book) return;
+    timers.current.forEach((t) => window.clearTimeout(t));
+    timers.current = [];
+    setLanded(null);
     setSpinning(true);
-    // Made the moment you press the button — closing the window doesn't undo it.
-    await updateLifeItem(book.id, { type: 'book', status: 'inProgress', dateStarted: today, pickedOn: today });
     if (!book.coverUrl && !book.coverImageId) {
       bookInfo(book)
-        .then((info) => (info !== 'retry' && info.cover ? updateLifeItem(book.id, { type: 'book', coverUrl: info.cover, genres: book.genres ?? info.genres }) : undefined))
+        .then((info) =>
+          info !== 'retry' && info.cover
+            ? updateLifeItem(book.id, {
+                type: 'book',
+                coverUrl: info.cover,
+                genres: book.genres ?? info.genres,
+              })
+            : undefined,
+        )
         .catch(() => undefined);
     }
     let t = 0;
@@ -70,7 +87,7 @@ export default function BookPickModal({ books, onClose, onOpenBook }: Props) {
     }
     timers.current.push(
       window.setTimeout(() => {
-        setChosen(book);
+        setLanded(book);
         setSpinning(false);
       }, t),
     );
@@ -91,22 +108,53 @@ export default function BookPickModal({ books, onClose, onOpenBook }: Props) {
         </div>
       ) : live ? (
         <div className="text-center space-y-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-sage-700">{chosen ? 'You’re reading next' : 'Today’s pick'}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-sage-700">{isPromise ? 'You said you’ll read' : 'How about…'}</p>
           <Cover book={live} big />
           <div>
             <p className="serif text-xl font-semibold text-sand-900">{live.title}</p>
             {live.author && <p className="text-xs text-sand-800/60">{live.author}</p>}
           </div>
-          <p className="text-xs text-sand-800/70 bg-sand-50 rounded-2xl p-3">
-            ✓ Moved from want-to-read to reading, started today. A promise is a promise.
-          </p>
-          <button
-            onClick={() => onOpenBook(live)}
-            className="px-4 py-2 bg-sage-500 hover:bg-sage-700 text-white text-xs font-semibold rounded-2xl"
-          >
-            Open the book
-          </button>
-          {!chosen && <p className="text-[11px] text-sand-800/50">One pick a day — come back tomorrow for another.</p>}
+          {isPromise ? (
+            <>
+              <p className="text-xs text-sand-800/70 bg-sand-50 rounded-2xl p-3">
+                🤞 It stays on want-to-read — once you start it (here or on Goodreads), the promise counts as kept.
+              </p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <button
+                  onClick={() => onOpenBook(live)}
+                  className="px-4 py-2 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl"
+                >
+                  Open the book
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPromised(false);
+                    setLanded(null);
+                  }}
+                  className="px-4 py-2 text-sand-800/60 hover:text-sand-900 text-xs font-semibold"
+                >
+                  Pick another
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex gap-2">
+              <button onClick={spin} className="flex-1 py-3 bg-sand-100 hover:bg-sand-200 text-sand-900 text-sm font-semibold rounded-2xl">
+                Spin again
+              </button>
+              <button
+                onClick={() =>
+                  void updateLifeItem(live.id, {
+                    type: 'book',
+                    pickedOn: today,
+                  })
+                }
+                className="flex-1 py-3 bg-sage-500 hover:bg-sage-700 text-white text-sm font-semibold rounded-2xl shadow-sm"
+              >
+                I’ll read this
+              </button>
+            </div>
+          )}
         </div>
       ) : pool.length === 0 ? (
         <p className="text-sm text-sand-800/70 text-center py-4">Nothing on your want-to-read shelf to pick from.</p>
@@ -142,7 +190,8 @@ export default function BookPickModal({ books, onClose, onOpenBook }: Props) {
               )}
               {unsorted > 0 && (
                 <p className="text-[11px] text-sand-800/50">
-                  {unsorted.toLocaleString()} book{unsorted === 1 ? '' : 's'} not sorted into genres yet — that happens in the background while the app is open.
+                  {unsorted.toLocaleString()} book{unsorted === 1 ? '' : 's'} not sorted into genres yet — that happens in the background while the
+                  app is open.
                 </p>
               )}
             </div>
@@ -158,18 +207,17 @@ export default function BookPickModal({ books, onClose, onOpenBook }: Props) {
               </>
             )}
           </p>
-          <ul className="text-xs text-sand-800/70 bg-sand-50 rounded-2xl p-4 space-y-1.5">
-            <li>• Whatever comes up, you read it.</li>
-            <li>• It’s marked as reading, started today, the moment you spin.</li>
-            <li>• No re-rolls — one pick a day.</li>
-          </ul>
+          <p className="text-xs text-sand-800/70 bg-sand-50 rounded-2xl p-4 text-center">
+            Nothing gets logged. If you like what comes up, tap “I’ll read this” and it counts as a promise to yourself.
+          </p>
           <button
             onClick={spin}
             disabled={from.length === 0 || (mode === 'genre' && !genre)}
             className="w-full py-3 bg-sage-500 hover:bg-sage-700 disabled:opacity-40 text-white text-sm font-semibold rounded-2xl shadow-sm"
           >
-            I promise — spin
+            Spin
           </button>
+          <PromiseTracker rows={promises} verb="read" />
         </div>
       )}
     </Modal>

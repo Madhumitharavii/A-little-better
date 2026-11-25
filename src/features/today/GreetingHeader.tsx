@@ -7,9 +7,11 @@ interface GreetingHeaderProps {
   streaks: StreakMetrics;
   onOpenBored: () => void;
   onOpenScrolling: () => void;
+  /** "Today is hard" — switches Today to bad-day mode. */
+  onBadDay: () => void;
 }
 
-export default function GreetingHeader({ date, streaks, onOpenBored, onOpenScrolling }: GreetingHeaderProps) {
+export default function GreetingHeader({ date, streaks, onOpenBored, onOpenScrolling, onBadDay }: GreetingHeaderProps) {
   const hour = new Date().getHours();
   let greeting = 'Good morning';
   if (hour >= 12 && hour < 17) greeting = 'Good afternoon';
@@ -41,6 +43,12 @@ export default function GreetingHeader({ date, streaks, onOpenBored, onOpenScrol
           className="px-4 py-2.5 sm:py-2 bg-white hover:bg-sand-50 border border-sand-300 rounded-2xl text-xs font-semibold text-sand-900 shadow-sm transition-all flex items-center gap-2"
         >
           <span>📱</span> I'm scrolling
+        </button>
+        <button
+          onClick={onBadDay}
+          className="px-4 py-2.5 sm:py-2 bg-white hover:bg-sand-50 border border-sand-300 rounded-2xl text-xs font-semibold text-sand-900 shadow-sm transition-all flex items-center gap-2"
+        >
+          <span>☁️</span> Today is hard
         </button>
       </div>
     </section>

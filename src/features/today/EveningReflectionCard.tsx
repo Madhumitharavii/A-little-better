@@ -61,7 +61,7 @@ export default function EveningReflectionCard({
       ) : (
         <div className="space-y-3">
           <p className="text-sm font-semibold text-sand-900">Today's Reflection</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
             <div>
               <label className="block text-xs font-medium text-sand-800 mb-1.5">Something I am grateful for today</label>
               <textarea

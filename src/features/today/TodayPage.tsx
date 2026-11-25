@@ -3,6 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/db';
 import { breakfastNudge, LOOK_BACK_DAYS, type MealKey, type MealState } from './meals';
 import LetterOpenBanner from '@/features/letters/LetterOpenBanner';
+import OnThisDayCard from '@/features/memories/OnThisDayCard';
+import YearReviewCard from '@/features/review/YearReviewCard';
+import BadDayView from './BadDayView';
+import MealsRow from './MealsRow';
+import { useBadDay } from './badDay';
 import { useTodayCare } from './useTodayCare';
 import { useCareDay } from './useCareDay';
 import { addDays } from '@/db/dateUtils';
@@ -42,19 +47,8 @@ interface TodayPageProps {
 }
 
 export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
-  const {
-    date,
-    careEntries,
-    reflection,
-    findEntry,
-    markDone,
-    markSkipped,
-    toggleDone,
-    addMinutes,
-    clear,
-    saveReflectionField,
-    saveEveningNotes,
-  } = useTodayCare();
+  const { date, careEntries, reflection, findEntry, markDone, markSkipped, toggleDone, addMinutes, clear, saveReflectionField, saveEveningNotes } =
+    useTodayCare();
   const streaks = useStreaks();
   // Care for Me can also be ticked for yesterday (done just before midnight, ticked just after).
   const yesterday = addDays(date, -1);
@@ -85,14 +79,43 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
   const closeTool = () => setActiveTool(null);
 
   const chime = (type: 'gentle' | 'complete' = 'complete') => playSoftChime(soundEnabled, type);
+  const [badDay, setBadDay] = useBadDay(date);
 
-  return (
+  const evening = (
+    <EveningReflectionCard
+      gratitude={reflection?.gratitude ?? ''}
+      smallWin={reflection?.smallWin ?? ''}
+      onChange={(field, value) => saveReflectionField(field, value)}
+      eveningDone={!!reflection?.eveningDone}
+      onOpenEvening={() => openTool('evening')}
+    />
+  );
+
+  const page = badDay ? (
+    <BadDayView
+      meals={
+        <MealsRow
+          findEntry={(k) => findEntry(k)}
+          onSet={(k, st) => {
+            if (st === 'ate') {
+              void markDone(k);
+              chime();
+            } else if (st === 'skipped') void markSkipped(k, 'skipped');
+            else void clear(k);
+          }}
+          nudge={null}
+        />
+      }
+      evening={evening}
+      onEnd={() => setBadDay(false)}
+    />
+  ) : (
     // One column on phones; two from tablet width; on a wide window, three columns:
-    //   greeting · thought
-    //   today's focus
-    //   Care for Me · Care Around Me · Noticed + This Evening
+    //   greeting · this evening
+    //   thought, and any banners
+    //   Care for Me · Care Around Me · Noticed + On this day
     //   toolbox
-    // (The order on the page is unchanged, so phones read top to bottom as before.)
+    // (Phones read top to bottom in that same order, so This Evening is near the top.)
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-[auto_auto_auto_1fr_auto] gap-6 sm:gap-8 xl:gap-6 items-start">
       <div className="md:col-span-2 xl:col-span-8 xl:row-start-1 xl:h-full xl:[&>*]:h-full">
         <GreetingHeader
@@ -100,15 +123,16 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
           streaks={streaks}
           onOpenBored={() => openTool('bored')}
           onOpenScrolling={() => openTool('scrolling')}
+          onBadDay={() => setBadDay(true)}
         />
       </div>
 
-      <div className="md:col-span-2 xl:col-span-4 xl:row-start-1 xl:h-full xl:[&>*]:h-full xl:[&>*]:flex xl:[&>*]:flex-col xl:[&>*]:justify-center">
-        <ThoughtOfTheDayCard />
-      </div>
+      <div className="md:col-span-2 xl:col-span-4 xl:row-start-1 xl:h-full xl:[&>*]:h-full">{evening}</div>
 
       <div className="md:col-span-2 xl:col-span-12 xl:row-start-2 space-y-4">
+        <ThoughtOfTheDayCard />
         <LetterOpenBanner />
+        <YearReviewCard seasonal />
         <TodayFocusBanner
           myselfDone={findEntry('bathed')?.status === 'done' || findEntry('ateFruit')?.status === 'done'}
           spaceDone={findEntry('spaceReset')?.status === 'done'}
@@ -134,7 +158,6 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
             chime();
           }}
           onOpenFocusTimer={() => openTool('focusTimer')}
-          showToast={showToast}
           onSetMeal={setMeal}
           breakfastNudge={nudge}
         />
@@ -156,21 +179,21 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
         <AdvisorCard />
       </div>
 
+      <div className="md:col-span-2 xl:col-span-4 xl:col-start-9 xl:row-start-4">
+        <OnThisDayCard today={date} />
+      </div>
+
       {/* Folded by default — see ToolboxGrid. Sits after the daily care
           so the everyday checklist comes first. */}
       <div className="md:col-span-2 xl:col-span-12 xl:row-start-5">
         <ToolboxGrid openTool={openTool} />
       </div>
+    </div>
+  );
 
-      <div className="md:col-span-2 xl:col-span-4 xl:col-start-9 xl:row-start-4">
-        <EveningReflectionCard
-          gratitude={reflection?.gratitude ?? ''}
-          smallWin={reflection?.smallWin ?? ''}
-          onChange={(field, value) => saveReflectionField(field, value)}
-          eveningDone={!!reflection?.eveningDone}
-          onOpenEvening={() => openTool('evening')}
-        />
-      </div>
+  return (
+    <>
+      {page}
 
       {/* Skip reason */}
       {skipTarget && (
@@ -185,14 +208,10 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
 
       {/* Mindful-redirect tools */}
       {activeTool === 'bored' && <BoredTool date={date} onClose={closeTool} showToast={showToast} openTool={openTool} />}
-      {activeTool === 'scrolling' && (
-        <ScrollingTool date={date} onClose={closeTool} showToast={showToast} openTool={openTool} />
-      )}
+      {activeTool === 'scrolling' && <ScrollingTool date={date} onClose={closeTool} showToast={showToast} openTool={openTool} />}
 
       {/* Reflection tools */}
-      {activeTool === 'procrastination' && (
-        <ProcrastinationTool date={date} onClose={closeTool} showToast={showToast} openTool={openTool} />
-      )}
+      {activeTool === 'procrastination' && <ProcrastinationTool date={date} onClose={closeTool} showToast={showToast} openTool={openTool} />}
       {activeTool === 'overthinking' && <OverthinkingTool date={date} onClose={closeTool} showToast={showToast} />}
       {activeTool === 'temper' && <TemperTool date={date} onClose={closeTool} showToast={showToast} />}
       {activeTool === 'selfDoubt' && <SelfDoubtTool date={date} onClose={closeTool} showToast={showToast} />}
@@ -215,7 +234,13 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
           onClose={closeTool}
           onComplete={async (mins, focusFor) => {
             addMinutes('focus', mins);
-            if (focusFor) await logStudySession({ subject: focusFor.subject, topicId: focusFor.topicId, minutes: mins, fromFocus: true });
+            if (focusFor)
+              await logStudySession({
+                subject: focusFor.subject,
+                topicId: focusFor.topicId,
+                minutes: mins,
+                fromFocus: true,
+              });
             chime();
             showToast(
               focusFor
@@ -271,6 +296,6 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
           }}
         />
       )}
-    </div>
+    </>
   );
 }

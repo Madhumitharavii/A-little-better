@@ -7,6 +7,7 @@ import { migrateLocalToolEvents } from './db/repositories/toolEventRepository';
 import { startPrefSync } from './lib/prefSync';
 import { startFeedSync } from './lib/feedSync';
 import { startCoverFill } from './lib/coverFill';
+import { undoPickAutoLogs } from './lib/undoPickLogs';
 import './index.css';
 
 // Runs once, in a normal (writable) Dexie transaction — this is
@@ -15,6 +16,7 @@ import './index.css';
 // overwrites settings from a previous launch.
 void ensureDefaultSettings();
 void migrateLocalToolEvents();
+void undoPickAutoLogs();
 startPrefSync();
 startFeedSync();
 startCoverFill();

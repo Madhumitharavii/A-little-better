@@ -34,7 +34,6 @@ interface CareForMeSectionProps {
   onRequestSkip: (itemKey: string) => void;
   onAddReadingMinutes: (minutes: number) => void;
   onOpenFocusTimer: () => void;
-  showToast: (msg: string) => void;
 }
 
 export default function CareForMeSection({
@@ -45,7 +44,6 @@ export default function CareForMeSection({
   onRequestSkip,
   onAddReadingMinutes,
   onOpenFocusTimer,
-  showToast,
   onSetMeal,
   breakfastNudge,
 }: CareForMeSectionProps) {
@@ -136,7 +134,6 @@ export default function CareForMeSection({
             entry={findEntry('reading')}
             onAddMinutes={onAddReadingMinutes}
             onToggleDone={() => onToggleDone('reading')}
-            showToast={showToast}
             dayWord={dayWord}
           />
 

@@ -9,7 +9,7 @@ import type { SyncedPrefItem } from '../schema';
  * synced lifeItems table (type "pref"), so they travel with normal sync —
  * no extra database tables needed. Reads take the newest row for a key.
  */
-export type PrefKey = 'aiEnabled' | 'advisorHistory' | 'advisorSeen' | 'studyTimer' | 'connectedAccounts' | 'water' | 'savedLines' | 'meals';
+export type PrefKey = 'aiEnabled' | 'advisorHistory' | 'advisorSeen' | 'studyTimer' | 'connectedAccounts' | 'water' | 'savedLines' | 'meals' | 'badDay';
 
 const table = () => db.lifeItems as unknown as Table<SyncedPrefItem, string>;
 

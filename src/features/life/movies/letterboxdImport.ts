@@ -277,7 +277,7 @@ export function mergeFilmIntoExisting(existing: MovieItem, f: LetterboxdFilm, op
       : []),
   ];
   const combined = current.map((w) => ({ ...w }));
-  // A film "Pick for me" logged today, then logged on Letterboxd (maybe a day later) — that's the same watch, not a rewatch.
+  // A film picked and logged in the app on the pick day, then logged on Letterboxd (maybe a day later) — that’s the same watch, not a rewatch.
   let picked =
     existing.pickedOn && existing.dateWatched === existing.pickedOn && !existing.previousWatches?.length
       ? combined.find((c) => c.date === existing.pickedOn)

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import Modal, { ModalHeader } from '@/shared/components/Modal';
 import { markContactedToday } from '@/db/repositories/peopleRepository';
 import { usePeople } from '@/features/people/usePeople';
@@ -12,26 +11,9 @@ interface RelationshipConnectionToolProps {
   onConnected: () => void;
 }
 
-const PROMPTS = [
-  "Hey! Thinking of you today. Hope your week is treating you gently 🌿",
-  "Saw something today that reminded me of you! Hope you're doing well.",
-  "No need to reply right away—just wanted to send a warm hello!",
-];
-
 export default function RelationshipConnectionTool({ onClose, onComplete, onConnected }: RelationshipConnectionToolProps) {
-  const [copied, setCopied] = useState<number | null>(null);
   const people = usePeople();
   const today = getLocalDateKey();
-
-  const copyPrompt = async (text: string, index: number) => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Clipboard API can fail on older browsers; fail silently, it's a nicety.
-    }
-    setCopied(index);
-    setTimeout(() => setCopied(null), 2000);
-  };
 
   return (
     <Modal onClose={onClose}>
@@ -79,22 +61,6 @@ export default function RelationshipConnectionTool({ onClose, onComplete, onConn
           Tip: add the people you want to stay close to under Me → My People, and they'll show up here.
         </p>
       )}
-
-      <div className="space-y-2">
-        <p className="text-xs font-semibold text-sand-900">Optional message ideas (tap to copy):</p>
-        {PROMPTS.map((prompt, idx) => (
-          <button
-            key={idx}
-            onClick={() => copyPrompt(prompt, idx)}
-            className="w-full p-3 bg-sand-50 hover:bg-sand-100 border border-sand-200 rounded-2xl text-xs text-sand-900 text-left transition-all relative group"
-          >
-            <span className="block pr-16">"{prompt}"</span>
-            <span className="absolute right-3 top-3 text-[10px] font-semibold text-terracotta-600 bg-terracotta-100 px-2 py-0.5 rounded-lg">
-              {copied === idx ? 'Copied! ✓' : 'Copy'}
-            </span>
-          </button>
-        ))}
-      </div>
 
       <button
         onClick={onComplete}
