@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150">
+  <!-- "Sprout at night": the app icon. Full-bleed square — phones round the corners themselves. -->
+  <rect width="150" height="150" fill="#241F1B"/>
+  <g transform="translate(0 0)">
+    <ellipse cx="75" cy="122" rx="30" ry="6" fill="#5CC696" opacity="0.3"/>
+    <path d="M75 122 C75 100 75 80 75 64" stroke="#F3EDE6" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <path d="M75 100 C57 100 42 89 40 73 C57 73 72 84 75 100 Z" fill="#5CC696"/>
+    <path d="M75 100 C93 100 108 89 110 73 C93 73 78 84 75 100 Z" fill="#F46A4A"/>
+    <path d="M75 66 C61 64 50 52 50 37 C64 39 74 51 75 66 Z" fill="#F46A4A"/>
+    <path d="M75 66 C89 64 100 52 100 37 C86 39 76 51 75 66 Z" fill="#5CC696"/>
+  </g>
+</svg>
