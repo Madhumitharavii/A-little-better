@@ -208,12 +208,16 @@ export function yearReview(input: ReviewInput, year: number): YearReview {
   return review;
 }
 
-/** Years that have anything to look back on, newest first. */
+/**
+ * Finished years that have anything to look back on, newest first. The
+ * year you're in stays sealed — it's gathered quietly and opens on
+ * 1 January.
+ */
 export function reviewYears(input: ReviewInput, thisYear: number): number[] {
-  const years = new Set<number>([thisYear]);
+  const years = new Set<number>();
   const note = (d?: string | null) => {
     const n = Number(d?.slice(0, 4));
-    if (n > 1900 && n <= thisYear) years.add(n);
+    if (n > 1900 && n < thisYear) years.add(n);
   };
   for (const r of input.life) {
     if (r.deletedAt) continue;

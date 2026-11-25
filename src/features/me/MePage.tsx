@@ -1,5 +1,4 @@
 import StatsSection from './StatsSection';
-import YearReviewCard from '@/features/review/YearReviewCard';
 import RemindersSection from './RemindersSection';
 import PeriodSection from './period/PeriodSection';
 import PeopleSection from '@/features/people/PeopleSection';
@@ -13,7 +12,6 @@ interface MePageProps {
 export default function MePage({ showToast }: MePageProps) {
   return (
     <div className="space-y-6">
-      <YearReviewCard />
       <section className="bg-white p-5 sm:p-8 rounded-3xl border border-sand-200 shadow-sm space-y-6">
         <div className="border-b border-sand-100 pb-3">
           <h2 className="serif text-2xl font-semibold text-sand-900">Take Care of Me</h2>

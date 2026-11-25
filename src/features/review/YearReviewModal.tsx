@@ -63,13 +63,19 @@ export default function YearReviewModal({ onClose, initialYear }: { onClose: () 
     () => (ready ? { life: life!, journal: journal!, reflections: reflections!, care: care!, savedLines } : null),
     [ready, life, journal, reflections, care, savedLines],
   );
-  const years = useMemo(() => (input ? reviewYears(input, thisYear) : [thisYear]), [input, thisYear]);
-  const [year, setYear] = useState(initialYear ?? thisYear);
+  const years = useMemo(() => (input ? reviewYears(input, thisYear) : []), [input, thisYear]);
+  const [picked, setPicked] = useState<number | undefined>(initialYear);
+  // Only finished years open — the one you're in stays sealed until 1 January.
+  const year = picked !== undefined && picked < thisYear ? picked : years[0] ?? thisYear - 1;
+  const setYear = setPicked;
   const r = useMemo(() => (input ? yearReview(input, year) : null), [input, year]);
 
   return (
     <Modal onClose={onClose} maxWidthClassName="max-w-2xl">
       <ModalHeader icon="✨" title={`Your ${year}`} onClose={onClose} />
+      <p className="text-[11px] text-sand-800/60 -mt-3">
+        🔒 {thisYear} is being gathered quietly — it opens on 1 January {thisYear + 1}.
+      </p>
       {years.length > 1 && (
         <div className="flex gap-1.5 flex-wrap -mt-2">
           {years.map((y) => (
@@ -90,9 +96,7 @@ export default function YearReviewModal({ onClose, initialYear }: { onClose: () 
         <p className="text-sm text-sand-800/60 text-center py-8">Nothing logged for {year} yet.</p>
       ) : (
         <div className="space-y-4">
-          <p className="serif text-lg text-sand-900 text-center italic">
-            {year === thisYear ? 'Here’s your year so far — every bit of it counts.' : `A look back at ${year}.`}
-          </p>
+          <p className="serif text-lg text-sand-900 text-center italic">A look back at {year}.</p>
 
           {r.films.watches > 0 && (
             <Block icon="🎬" title="Films" tone="bg-slate-100/70 border-slate-500/20">
@@ -109,7 +113,7 @@ export default function YearReviewModal({ onClose, initialYear }: { onClose: () 
               )}
               {r.films.first && r.films.last && r.films.first.id !== r.films.last.id && (
                 <p className="text-[11px] text-sand-800/60">
-                  Started the year with <b>{r.films.first.title}</b> and {year === thisYear ? 'most recently' : 'ended it with'} <b>{r.films.last.title}</b>.
+                  Started the year with <b>{r.films.first.title}</b> and ended it with <b>{r.films.last.title}</b>.
                 </p>
               )}
             </Block>

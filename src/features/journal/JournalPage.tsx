@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useJournal } from './useJournal';
-import JournalEntryCard from './JournalEntryCard';
+import JournalEntryRow from './JournalEntryRow';
+import JournalEntryModal from './JournalEntryModal';
 import JournalEditorModal from './JournalEditorModal';
 import type { JournalEntry } from '@/db/schema';
 import AiJournalTools from '@/features/ai/AiJournalTools';
@@ -14,6 +15,8 @@ export default function JournalPage({ showToast }: JournalPageProps) {
   const { entries, createEntry, updateEntry, removeEntry } = useJournal();
   const [editorState, setEditorState] = useState<'closed' | 'new' | JournalEntry>('closed');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [reading, setReading] = useState<JournalEntry | null>(null);
+  const open = reading ? entries.find((e) => e.id === reading.id) ?? null : null;
 
   return (
     <div className="space-y-6">
@@ -30,9 +33,13 @@ export default function JournalPage({ showToast }: JournalPageProps) {
         </button>
       </section>
 
-      <LettersCard showToast={showToast} />
-
-      <AiJournalTools />
+      {/* Search (and themes) on the left; letters to future me — used now and then — small on the right. */}
+      <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-4 lg:items-start">
+        <div className="lg:col-span-2">
+          <AiJournalTools />
+        </div>
+        <LettersCard showToast={showToast} />
+      </div>
 
       {entries.length === 0 ? (
         <div className="bg-white p-8 rounded-3xl border border-sand-200 text-center space-y-2">
@@ -40,16 +47,29 @@ export default function JournalPage({ showToast }: JournalPageProps) {
           <p className="text-sm text-sand-800/70">Nothing here yet — and that's alright.</p>
         </div>
       ) : (
-        <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
-          {entries.map((entry) => (
-            <JournalEntryCard
-              key={entry.id}
-              entry={entry}
-              onEdit={() => setEditorState(entry)}
-              onDelete={() => setConfirmDeleteId(entry.id)}
-            />
-          ))}
-        </div>
+        <section className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60">Your entries</h3>
+          <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2">
+            {entries.map((entry) => (
+              <JournalEntryRow key={entry.id} entry={entry} onOpen={() => setReading(entry)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {open && (
+        <JournalEntryModal
+          entry={open}
+          onClose={() => setReading(null)}
+          onEdit={() => {
+            setReading(null);
+            setEditorState(open);
+          }}
+          onDelete={() => {
+            setReading(null);
+            setConfirmDeleteId(open.id);
+          }}
+        />
       )}
 
       {editorState !== 'closed' && (

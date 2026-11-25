@@ -98,6 +98,19 @@ export default function App() {
     // Meal nudges (lib/mealReminders.ts) and letters from your past self opening (lib/letterWatch.ts).
     startMealReminders(queued(9000, 'gentle'));
     startLetterWatch(queued(12000, 'complete'));
+    // Once, early in January: last year's review has opened (see features/review).
+    const now = new Date();
+    if (now.getMonth() === 0 && now.getDate() <= 15) {
+      const year = String(now.getFullYear() - 1);
+      try {
+        if (localStorage.getItem('alb.review.announced') !== year) {
+          localStorage.setItem('alb.review.announced', year);
+          window.setTimeout(() => queued(12000, 'complete')(`✨ Your ${year} in review is here — it’s on Today.`), 5000);
+        }
+      } catch {
+        /* storage unavailable — the card on Today still shows */
+      }
+    }
   }, [showToast]);
 
   // Best-effort reminders: checked whenever the app is opened or

@@ -4,6 +4,7 @@ import { useLifeRows } from '@/db/lifeStore';
 import type { LifeItem, WishItem } from '@/db/schema';
 import { useRecentlyAdded, useLifeCounts, useLifeSearch, useLifeItemsOfType } from './useLifeItems';
 import LifeSearchBar from './LifeSearchBar';
+import YearReviewCard from '@/features/review/YearReviewCard';
 import LifeItemMiniCard from './LifeItemMiniCard';
 import BooksPage from './books/BooksPage';
 import MoviesPage from './movies/MoviesPage';
@@ -143,6 +144,13 @@ export default function LifePage({ showToast, openItemId, onOpenedItem }: LifePa
               </div>
             </section>
           )}
+
+          <section className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-sand-800/60">Looking back</h3>
+            <div className="lg:w-1/2">
+              <YearReviewCard />
+            </div>
+          </section>
         </>
       )}
     </div>

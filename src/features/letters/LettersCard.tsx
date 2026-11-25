@@ -19,22 +19,22 @@ export default function LettersCard({ showToast }: { showToast: (msg: string) =>
   const opened = letters.filter((l) => isOpen(l, today)).reverse();
 
   return (
-    <section className="bg-white p-5 sm:p-6 rounded-3xl border border-sand-200 shadow-sm space-y-4">
+    <section className="bg-white p-4 sm:p-5 rounded-3xl border border-sand-200 shadow-sm space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="serif text-lg font-semibold text-sand-900">💌 Letters to future me</h3>
-          <p className="text-xs text-sand-800/60">Write now, sealed until the day you choose. Then it opens by itself.</p>
+          <h3 className="serif text-base font-semibold text-sand-900">💌 Letters to future me</h3>
+          <p className="text-[11px] text-sand-800/60">Sealed until the day you choose.</p>
         </div>
         <button
           onClick={() => setWriting(true)}
-          className="px-3.5 py-2 bg-sand-100 hover:bg-sand-200 text-sand-900 text-xs font-semibold rounded-2xl shrink-0"
+          className="px-3 py-1.5 bg-sand-100 hover:bg-sand-200 text-sand-900 text-[11px] font-semibold rounded-xl shrink-0"
         >
-          ✉️ Write one
+          ✉️ Write
         </button>
       </div>
 
       {letters.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="space-y-2 max-h-72 overflow-y-auto">
           {opened.map((l) => (
             <li key={l.id}>
               <button

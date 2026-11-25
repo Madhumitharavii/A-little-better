@@ -139,7 +139,7 @@ export default function TodayPage({ showToast, soundEnabled }: TodayPageProps) {
         {/* On phones and tablets the thought comes after This Evening. */}
         <ThoughtOfTheDayCard className="xl:hidden" />
         <LetterOpenBanner />
-        <YearReviewCard seasonal />
+        <YearReviewCard justOpened />
         <TodayFocusBanner
           myselfDone={findEntry('bathed')?.status === 'done' || findEntry('ateFruit')?.status === 'done'}
           spaceDone={findEntry('spaceReset')?.status === 'done'}
